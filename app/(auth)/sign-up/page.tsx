@@ -9,11 +9,12 @@ function SignUpForm() {
   const searchParams = useSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const error = searchParams.get("error");
+  const redirectUrl = searchParams.get("redirect_url");
+  const signInHref = redirectUrl ? `/sign-in?redirect_url=${encodeURIComponent(redirectUrl)}` : "/sign-in";
 
   const continueWithGoogle = () => {
     setIsSubmitting(true);
-    const redirectUrl = searchParams.get("redirect_url") || "/dashboard";
-    window.location.href = `/api/auth/google?state=${encodeURIComponent(redirectUrl)}`;
+    window.location.href = `/api/auth/google?state=${encodeURIComponent(redirectUrl || "/dashboard")}`;
   };
 
   return (
@@ -47,7 +48,7 @@ function SignUpForm() {
 
       <p className="mt-6 text-center text-xs text-on-surface/60">
         Already have an account?{" "}
-        <Link href="/sign-in" className="text-primary hover:text-primary/90 transition-colors">
+        <Link href={signInHref} className="text-primary hover:text-primary/90 transition-colors">
           Sign in
         </Link>
       </p>

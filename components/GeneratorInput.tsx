@@ -1,14 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface GeneratorInputProps {
   onGenerate: (text: string) => void;
   isLoading: boolean;
+  initialText?: string;
 }
 
-export function GeneratorInput({ onGenerate, isLoading }: GeneratorInputProps) {
-  const [text, setText] = useState("");
+export function GeneratorInput({ onGenerate, isLoading, initialText = "" }: GeneratorInputProps) {
+  const [text, setText] = useState(initialText);
+
+  useEffect(() => {
+    if (!initialText) return;
+    setText((current) => current || initialText);
+  }, [initialText]);
 
   return (
     <div className="space-y-4">

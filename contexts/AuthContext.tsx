@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
-    window.location.href = "/sign-in";
+    window.location.href = "/";
   }, []);
 
   return (

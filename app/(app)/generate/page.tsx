@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,16 +11,21 @@ import { LoadingState } from "@/components/LoadingState";
 import { canUseFeature, getFeatureUpgradeMessage } from "@/lib/billing";
 import type { GeneratedBrief } from "@/types/brief";
 
+const PENDING_BRIEF_INPUT_KEY = "scopedrop.pendingBriefInput";
+const PENDING_BRIEF_AUTO_GENERATE_KEY = "scopedrop.pendingBriefAutoGenerate";
+
 function GenerateContent() {
-  const { isSignedIn, refresh, user } = useAuth();
+  const { isLoaded, isSignedIn, refresh, user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const briefId = searchParams.get("id");
   const [brief, setBrief] = useState<GeneratedBrief | null>(null);
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [loadedBriefId, setLoadedBriefId] = useState<string | null>(null);
+  const [initialInput, setInitialInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pendingGenerateStartedRef = useRef(false);
   const canExportPDF = canUseFeature(user?.plan, "pdfExport");
   const pdfExportUpgradeMessage = getFeatureUpgradeMessage("pdfExport");
 
@@ -39,7 +44,7 @@ function GenerateContent() {
       .finally(() => setIsLoading(false));
   }, [briefId, isSignedIn]);
 
-  async function handleGenerate(rawInput: string) {
+  const handleGenerate = useCallback(async (rawInput: string) => {
     setIsLoading(true);
     setError(null);
     setBrief(null);
@@ -55,6 +60,12 @@ function GenerateContent() {
       const data = await res.json();
 
       if (!res.ok) {
+        if (res.status === 401) {
+          sessionStorage.setItem(PENDING_BRIEF_INPUT_KEY, rawInput);
+          sessionStorage.setItem(PENDING_BRIEF_AUTO_GENERATE_KEY, "1");
+          router.push(`/sign-in?redirect_url=${encodeURIComponent("/generate?continue=1")}`);
+          return;
+        }
         if (res.status === 403) {
           router.push("/settings/billing");
           return;
@@ -63,6 +74,8 @@ function GenerateContent() {
         return;
       }
 
+      sessionStorage.removeItem(PENDING_BRIEF_INPUT_KEY);
+      sessionStorage.removeItem(PENDING_BRIEF_AUTO_GENERATE_KEY);
       setBrief(data.brief);
       setShareToken(data.shareToken ?? null);
       setLoadedBriefId(data.briefId ?? null);
@@ -72,7 +85,29 @@ function GenerateContent() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [refresh, router]);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || briefId || pendingGenerateStartedRef.current) return;
+    if (searchParams.get("continue") !== "1") return;
+
+    const pendingInput = sessionStorage.getItem(PENDING_BRIEF_INPUT_KEY) ?? "";
+    const shouldAutoGenerate = sessionStorage.getItem(PENDING_BRIEF_AUTO_GENERATE_KEY) === "1";
+
+    sessionStorage.removeItem(PENDING_BRIEF_AUTO_GENERATE_KEY);
+
+    if (pendingInput.length < 20) {
+      sessionStorage.removeItem(PENDING_BRIEF_INPUT_KEY);
+      return;
+    }
+
+    setInitialInput(pendingInput);
+
+    if (!shouldAutoGenerate) return;
+
+    pendingGenerateStartedRef.current = true;
+    void handleGenerate(pendingInput);
+  }, [briefId, handleGenerate, isLoaded, isSignedIn, searchParams]);
 
   async function handleExportPDF() {
     if (!brief || !loadedBriefId) return;
@@ -146,7 +181,7 @@ function GenerateContent() {
             exit={{ opacity: 0, y: -12 }}
             transition={{ type: "spring", stiffness: 100, damping: 18 }}
           >
-            <GeneratorInput onGenerate={handleGenerate} isLoading={isLoading} />
+            <GeneratorInput onGenerate={handleGenerate} isLoading={isLoading} initialText={initialInput} />
           </motion.div>
         )}
 

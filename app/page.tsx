@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { Sparkle, ArrowRight, SealCheck, Files, Robot, CurrencyDollar, Lightning, Gauge, CheckCircle, Check, Star, Storefront } from "@phosphor-icons/react";
 import { Nav } from "@/components/layout/Nav";
 import { Footer } from "@/components/layout/Footer";
+import { useAuth } from "@/contexts/AuthContext";
+
+const PENDING_BRIEF_INPUT_KEY = "scopedrop.pendingBriefInput";
+const PENDING_BRIEF_AUTO_GENERATE_KEY = "scopedrop.pendingBriefAutoGenerate";
 
 const examples = [
   "whatsapp: hey need logo + branding for my bakery, budget around 15k, need by month end",
@@ -34,6 +38,7 @@ function TypewriterPlaceholder() {
 
 export default function LandingPage() {
   const router = useRouter();
+  const { isLoaded, isSignedIn } = useAuth();
   const [input, setInput] = useState("");
   const [showPlaceholder, setShowPlaceholder] = useState(true);
   const [isGeneratingCompare, setIsGeneratingCompare] = useState(false);
@@ -42,8 +47,18 @@ export default function LandingPage() {
 
   const handleDemo = useCallback(() => {
     if (input.length < 20) return;
-    router.push(`/generate?demo=${encodeURIComponent(input)}`);
-  }, [input, router]);
+
+    sessionStorage.setItem(PENDING_BRIEF_INPUT_KEY, input);
+    sessionStorage.setItem(PENDING_BRIEF_AUTO_GENERATE_KEY, "1");
+
+    const continuePath = "/generate?continue=1";
+    if (!isLoaded || isSignedIn) {
+      router.push(continuePath);
+      return;
+    }
+
+    router.push(`/sign-in?redirect_url=${encodeURIComponent(continuePath)}`);
+  }, [input, isLoaded, isSignedIn, router]);
 
   const handleGenerateComparison = useCallback(() => {
     if (isGeneratingCompare || isCompareReady) return;

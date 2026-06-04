@@ -24,6 +24,18 @@ function safeRedirectPath(value: string | undefined): string {
   return value;
 }
 
+function signInErrorRedirect(req: NextRequest, error: string) {
+  const url = new URL("/sign-in", req.url);
+  url.searchParams.set("error", error);
+
+  const requestedRedirect = safeRedirectPath(req.cookies.get(OAUTH_REDIRECT_COOKIE)?.value);
+  if (requestedRedirect !== "/dashboard") {
+    url.searchParams.set("redirect_url", requestedRedirect);
+  }
+
+  return NextResponse.redirect(url);
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
@@ -32,13 +44,13 @@ export async function GET(req: NextRequest) {
   const expectedState = req.cookies.get(OAUTH_STATE_COOKIE)?.value;
 
   if (error || !code) {
-    const response = NextResponse.redirect(new URL("/sign-in?error=oauth_denied", req.url));
+    const response = signInErrorRedirect(req, "oauth_denied");
     clearOAuthCookies(response);
     return response;
   }
 
   if (!state || !expectedState || state !== expectedState) {
-    const response = NextResponse.redirect(new URL("/sign-in?error=oauth_state", req.url));
+    const response = signInErrorRedirect(req, "oauth_state");
     clearOAuthCookies(response);
     return response;
   }
@@ -46,7 +58,7 @@ export async function GET(req: NextRequest) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    const response = NextResponse.redirect(new URL("/sign-in?error=misconfigured", req.url));
+    const response = signInErrorRedirect(req, "misconfigured");
     clearOAuthCookies(response);
     return response;
   }
@@ -69,7 +81,7 @@ export async function GET(req: NextRequest) {
   const tokens = await tokenResponse.json();
   if (!tokenResponse.ok || !tokens.id_token) {
     console.error("Token exchange failed:", tokens);
-    const response = NextResponse.redirect(new URL("/sign-in?error=token_exchange", req.url));
+    const response = signInErrorRedirect(req, "token_exchange");
     clearOAuthCookies(response);
     return response;
   }
@@ -80,7 +92,7 @@ export async function GET(req: NextRequest) {
 
   const userInfo = await userInfoResponse.json();
   if (!userInfo.sub || !userInfo.email) {
-    const response = NextResponse.redirect(new URL("/sign-in?error=userinfo", req.url));
+    const response = signInErrorRedirect(req, "userinfo");
     clearOAuthCookies(response);
     return response;
   }

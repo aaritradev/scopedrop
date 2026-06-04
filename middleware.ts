@@ -17,7 +17,7 @@ const apiProtectedPaths = [
 ];
 
 export default async function middleware(req: NextRequest) {
-  const { pathname } = new URL(req.url);
+  const { pathname, search } = new URL(req.url);
 
   const isProtectedPage = protectedPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
   const isProtectedApi = apiProtectedPaths.some((s) => pathname === s || pathname.startsWith(s + "/"));
@@ -32,7 +32,7 @@ export default async function middleware(req: NextRequest) {
 
   if (isProtectedPage && !session) {
     const signInUrl = new URL("/sign-in", req.url);
-    signInUrl.searchParams.set("redirect_url", pathname);
+    signInUrl.searchParams.set("redirect_url", `${pathname}${search}`);
     return NextResponse.redirect(signInUrl);
   }
 
