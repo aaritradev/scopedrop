@@ -19,7 +19,15 @@ function getSessionSecret(): string {
   return value;
 }
 
-const secretBytes = new TextEncoder().encode(getSessionSecret());
+let cachedSecretBytes: Uint8Array | null = null;
+
+function getSecretBytes(): Uint8Array {
+  if (!cachedSecretBytes) {
+    cachedSecretBytes = new TextEncoder().encode(getSessionSecret());
+  }
+
+  return cachedSecretBytes;
+}
 
 function toArrayBuffer(ui8: Uint8Array): ArrayBuffer {
   const buf = new ArrayBuffer(ui8.length);
@@ -30,7 +38,7 @@ function toArrayBuffer(ui8: Uint8Array): ArrayBuffer {
 function importKey(usage: "sign" | "verify"): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     "raw",
-    toArrayBuffer(secretBytes),
+    toArrayBuffer(getSecretBytes()),
     { name: "HMAC", hash: "SHA-256" },
     false,
     [usage],

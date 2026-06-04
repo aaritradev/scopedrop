@@ -27,6 +27,35 @@ Use `RNGCryptoServiceProvider` for Windows PowerShell compatibility unless the r
 
 ---
 
+## [ERR-20260604-002] parallel_build_typecheck_race
+
+**Logged**: 2026-06-04T16:04:42.4077662+05:30
+**Priority**: low
+**Status**: pending
+**Area**: tests
+
+### Summary
+Running `npx tsc --noEmit` in parallel with `npm run build` can fail because Next regenerates `.next/types` during build.
+
+### Error
+```
+error TS6053: File 'D:/Projects/scopedrop/.next/types/app/.../*.ts' not found.
+```
+
+### Context
+- Command attempted: `npx tsc --noEmit` while `npm run build` was running at the same time.
+- The standalone build completed successfully.
+- The type-check failure was caused by generated `.next/types` files changing during the parallel build.
+
+### Suggested Fix
+Run `npm run build` and `npx tsc --noEmit` serially when `.next/types` are included in `tsconfig.json`.
+
+### Metadata
+- Reproducible: yes
+- Related Files: tsconfig.json
+
+---
+
 ## [ERR-20260604-001] next_lint_unconfigured
 
 **Logged**: 2026-06-04T14:44:29.8429206+05:30
