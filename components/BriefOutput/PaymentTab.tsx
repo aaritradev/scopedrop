@@ -8,6 +8,7 @@ interface PaymentTabProps {
 
 export function PaymentTab({ brief, editable = false, onChange }: PaymentTabProps) {
   const { paymentTerms } = brief;
+  const structureLabel = paymentTerms.structureLabel || "Payment Structure";
 
   const updatePayment = (key: "estimatedBudget" | "deposit" | "finalPayment", value: string) => {
     onChange?.({
@@ -34,6 +35,17 @@ export function PaymentTab({ brief, editable = false, onChange }: PaymentTabProp
 
   return (
     <div className="prose-brief space-y-6">
+      <div className="card-base p-4" style={{ backgroundColor: "oklch(0.62 0.14 75 / 0.06)" }}>
+        <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "oklch(0.62 0.14 75)" }}>
+          {structureLabel}
+        </p>
+        <p className="text-xs" style={{ color: "oklch(0.58 0.01 260)" }}>
+          {structureLabel === "Recommended Payment Structure"
+            ? "Client payment terms were incomplete, so ScopeDrop added a practical default to protect cash flow and delivery milestones."
+            : "Payment terms based on the available project information."}
+        </p>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="card-base p-4">
           <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "oklch(0.58 0.01 260)" }}>

@@ -71,5 +71,21 @@ export function normalizeBriefMetrics(brief: GeneratedBrief): string[] {
     }
   }
 
+  if (brief.clientWinProbability) {
+    const original = brief.clientWinProbability.probability;
+    brief.clientWinProbability.probability = normalizePercentScore(original);
+    if (original !== brief.clientWinProbability.probability) {
+      warnings.push(`Client win probability normalized from ${original} to ${brief.clientWinProbability.probability}%`);
+    }
+  }
+
+  if (brief.clientSeriousnessScore) {
+    const original = brief.clientSeriousnessScore.score;
+    brief.clientSeriousnessScore.score = normalizeRatingScore(original);
+    if (original !== brief.clientSeriousnessScore.score) {
+      warnings.push(`Client seriousness score normalized from ${original} to ${brief.clientSeriousnessScore.score}/10`);
+    }
+  }
+
   return warnings;
 }

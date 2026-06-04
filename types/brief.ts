@@ -23,6 +23,7 @@ export interface PaymentTerms {
   deposit: string;
   milestonePayments: string[];
   finalPayment: string;
+  structureLabel?: string;
 }
 
 export interface DiscoveryQuestion {
@@ -92,6 +93,31 @@ export interface ClientRiskScore {
 export interface MissingRequirement {
   requirement: string;
   priority: Priority;
+  whyItMatters?: string;
+  proposalImpact?: string;
+}
+
+export interface ProposalReadySummary {
+  projectOverview: string;
+  likelyDeliverables: string[];
+  timelineRecommendation: string;
+  pricingRecommendation: string;
+  majorAssumptions: string[];
+  suggestedEngagementApproach: string;
+}
+
+export interface ClientWinProbability {
+  probability: number;
+  reasoning: string;
+  positiveIndicators: string[];
+  concerns: string[];
+  negotiationAdvice: string;
+}
+
+export interface ClientSeriousnessScore {
+  score: number;
+  explanation: string;
+  signals: string[];
 }
 
 export interface PricingGuidance {
@@ -325,6 +351,9 @@ export interface GeneratedBrief {
   projectFailureRisk: ProjectFailureRisk;
   projectDecision: ProjectDecision;
   clientResponseDraft: string;
+  proposalReadySummary?: ProposalReadySummary;
+  clientWinProbability?: ClientWinProbability;
+  clientSeriousnessScore?: ClientSeriousnessScore;
   proposalReadinessIntelligence?: ProposalReadinessIntelligence;
   extractionWarnings?: ExtractionWarning[];
   _diagnostics?: DiagnosticInfo;

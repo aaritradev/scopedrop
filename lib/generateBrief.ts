@@ -307,6 +307,8 @@ const SYSTEM_PROMPT = `You extract project analysis from client messages into JS
 RULES:
 - Only use information explicitly stated in the client message.
 - For any field where the client message does not provide enough information: use exactly "Not Specified" for strings, empty arrays [] for lists, "Unknown" for other values. Never invent details.
+- Keep existing report sections complete and useful. If a recommendation is needed but not stated by the client, label it as recommended or assumed rather than presenting it as client-provided fact.
+- Prioritize discovery questions as CRITICAL, IMPORTANT, or OPTIONAL based on proposal risk.
 - Return ONLY valid JSON. No preamble, no markdown, no explanation.
 - Every field in the schema below must be present in your output.
 
@@ -323,7 +325,7 @@ Schema:
   "assumptions": ["..."],
   "deliverables": [{ "name": "...", "description": "...", "format": "...", "duePhase": "..." }],
   "timeline": [{ "milestone": "...", "description": "...", "estimatedDays": 0 }],
-  "paymentTerms": { "estimatedBudget": "...", "deposit": "...", "milestonePayments": ["..."], "finalPayment": "..." },
+  "paymentTerms": { "estimatedBudget": "...", "deposit": "...", "milestonePayments": ["..."], "finalPayment": "...", "structureLabel": "Recommended Payment Structure|Payment Structure" },
   "nextSteps": ["..."],
   "redFlags": ["..."],
   "confidenceScore": 0,
@@ -331,7 +333,7 @@ Schema:
   "discoveryQuestions": [{ "question": "...", "context": "...", "priority": "CRITICAL|IMPORTANT|OPTIONAL" }],
   "risks": [{ "risk": "...", "severity": "low|medium|high", "mitigation": "...", "priority": "CRITICAL|IMPORTANT|OPTIONAL" }],
   "scopeCreepWarnings": [{ "warning": "...", "why": "..." }],
-  "missingRequirements": [{ "requirement": "...", "priority": "CRITICAL|IMPORTANT|OPTIONAL" }],
+  "missingRequirements": [{ "requirement": "...", "priority": "CRITICAL|IMPORTANT|OPTIONAL", "whyItMatters": "...", "proposalImpact": "..." }],
   "upsellOpportunities": [{ "service": "...", "rationale": "..." }],
   "effortAnalysis": { "complexity": "Low|Medium|High|Very High", "breakdown": ["..."] },
   "proposalReadinessBreakdown": { "requirements": { "score": 0, "missing": ["..."] }, "technical": { "score": 0, "missing": ["..."] }, "business": { "score": 0, "missing": ["..."] }, "budget": { "score": 0, "missing": ["..."] }, "overallReadiness": 0, "explanation": "..." },
@@ -346,7 +348,10 @@ Schema:
   "clientTypeClassification": { "type": "...", "buyingBehavior": "...", "riskProfile": "...", "decisionSpeed": "...", "scopeChangeLikelihood": "..." },
   "projectFailureRisk": { "level": "Low|Medium|High", "factors": ["..."], "explanation": "..." },
   "projectDecision": { "action": "Accept|Accept with Conditions|Discovery Call Required|Renegotiate Scope|Decline", "reasoning": "..." },
-  "clientResponseDraft": "..."
+  "clientResponseDraft": "...",
+  "proposalReadySummary": { "projectOverview": "...", "likelyDeliverables": ["..."], "timelineRecommendation": "...", "pricingRecommendation": "...", "majorAssumptions": ["..."], "suggestedEngagementApproach": "..." },
+  "clientWinProbability": { "probability": 0, "reasoning": "...", "positiveIndicators": ["..."], "concerns": ["..."], "negotiationAdvice": "..." },
+  "clientSeriousnessScore": { "score": 0, "explanation": "...", "signals": ["..."] }
 }
 `;
 
@@ -1643,6 +1648,7 @@ function validateFinalReportGuards(brief: GeneratedBrief): string[] {
     ["Business Clarity", brief.proposalReadinessBreakdown?.business?.score],
     ["Budget Clarity", brief.proposalReadinessBreakdown?.budget?.score],
     ["Overall Readiness", brief.proposalReadinessBreakdown?.overallReadiness],
+    ["Client Seriousness Score", brief.clientSeriousnessScore?.score],
   ];
 
   for (const [label, value] of ratingFields) {
@@ -1653,6 +1659,10 @@ function validateFinalReportGuards(brief: GeneratedBrief): string[] {
 
   if (!Number.isFinite(brief.confidenceScore) || brief.confidenceScore < 0 || brief.confidenceScore > 100) {
     warnings.push("Confidence must be a 0-100 percentage");
+  }
+
+  if (brief.clientWinProbability && (!Number.isFinite(brief.clientWinProbability.probability) || brief.clientWinProbability.probability < 0 || brief.clientWinProbability.probability > 100)) {
+    warnings.push("Client win probability must be a 0-100 percentage");
   }
 
   const estimatedBudget = brief.paymentTerms?.estimatedBudget;
@@ -1672,12 +1682,343 @@ function validateFinalReportGuards(brief: GeneratedBrief): string[] {
   return warnings;
 }
 
+function hasUsefulText(value?: string): boolean {
+  return !!value && !/not specified|to be discussed|cannot estimate|cannot calculate|unknown|requires clarification|not applicable/i.test(value);
+}
+
+function addUnique(items: string[], item: string): void {
+  const normalized = item.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (!normalized) return;
+  if (!items.some(existing => existing.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() === normalized)) {
+    items.push(item);
+  }
+}
+
+function projectCategory(brief: GeneratedBrief, rawInput: string): "website" | "saas" | "marketing" | "branding" | "general" {
+  const text = `${rawInput} ${brief.projectTitle} ${brief.projectSummary} ${brief.scopeIncluded?.join(" ") || ""}`.toLowerCase();
+  if (/(?:ad campaign|paid ads|performance marketing|social media|content calendar|seo|marketing|influencer)/i.test(text)) return "marketing";
+  if (/(?:logo|brand|branding|identity|visual design|business cards|menu design|brand guideline)/i.test(text)) return "branding";
+  if (/(?:website|landing page|wordpress|shopify|webflow|ecommerce|e-commerce|redesign|portfolio)/i.test(text)) return "website";
+  if (/(?:saas|platform|dashboard|crm|portal|app|software|auth|api|database|integration|analytics)/i.test(text)) return "saas";
+  return "general";
+}
+
+function recommendedExclusions(category: ReturnType<typeof projectCategory>, rawInput: string): string[] {
+  const common = [
+    "Work outside the confirmed scope and deliverables",
+    "Unlimited revisions or open-ended change requests",
+    "Third-party subscription, licensing, hosting, or ad spend costs",
+    "Ongoing support or maintenance after handover unless separately agreed",
+  ];
+
+  const byCategory: Record<ReturnType<typeof projectCategory>, string[]> = {
+    website: [
+      "Mobile app development",
+      "Custom CRM or internal operations system",
+      "Custom booking engine or complex backend workflows",
+      "Content writing, photography, or videography",
+      "SEO retainers, hosting management, and post-launch optimization",
+    ],
+    saas: [
+      "Infrastructure usage costs and cloud vendor fees",
+      "Future feature requests beyond the first agreed release",
+      "Ongoing customer support, monitoring, or SLA coverage",
+      "Third-party integration fees, marketplace approvals, or vendor subscriptions",
+      "Native mobile apps unless explicitly included",
+    ],
+    marketing: [
+      "Media buying budget or ad spend",
+      "Influencer, creator, or partner fees",
+      "Video, photo, or large-scale creative production unless scoped",
+      "Landing page development or engineering support unless separately included",
+    ],
+    branding: [
+      "Trademark search, registration, or legal clearance",
+      "Printing, production, packaging, or vendor coordination costs",
+      "Photography, copywriting, or content creation unless separately scoped",
+      "Additional collateral beyond the agreed brand deliverables",
+    ],
+    general: [
+      "Procurement of third-party tools, licenses, or subscriptions",
+      "Content creation, data entry, or asset production unless explicitly scoped",
+      "Training, operations handover, or post-launch support beyond the agreed delivery window",
+    ],
+  };
+
+  const exclusions = [...byCategory[category], ...common];
+  if (!/(?:mobile|ios|android)/i.test(rawInput) && category !== "saas") addUnique(exclusions, "Native iOS or Android app development");
+  return exclusions;
+}
+
+function projectSize(brief: GeneratedBrief): "small" | "medium" | "large" {
+  const budgetNumber = Number(String(brief.paymentTerms?.estimatedBudget || "").replace(/[^\d]/g, ""));
+  const scopeCount = (brief.scopeIncluded || []).filter(item => !/requires clarification|not specified/i.test(item)).length;
+  const totalDays = (brief.timeline || []).reduce((sum, item) => sum + (Number.isFinite(item.estimatedDays) ? item.estimatedDays : 0), 0);
+
+  if (budgetNumber >= 1000000 || scopeCount >= 9 || totalDays >= 90) return "large";
+  if (budgetNumber >= 150000 || scopeCount >= 4 || totalDays >= 30) return "medium";
+  return "small";
+}
+
+function enrichPaymentTerms(brief: GeneratedBrief): void {
+  const size = projectSize(brief);
+  const paymentTerms = brief.paymentTerms || { estimatedBudget: "Not Specified", deposit: "", milestonePayments: [], finalPayment: "" };
+  const missingDeposit = !hasUsefulText(paymentTerms.deposit);
+  const missingFinal = !hasUsefulText(paymentTerms.finalPayment);
+  const weakMilestones = !paymentTerms.milestonePayments?.length || paymentTerms.milestonePayments.every(item => !hasUsefulText(item));
+  const needsRecommendation = missingDeposit || missingFinal || weakMilestones;
+
+  if (!needsRecommendation) {
+    brief.paymentTerms = { ...paymentTerms, structureLabel: paymentTerms.structureLabel || "Payment Structure" };
+    return;
+  }
+
+  const recommended = size === "large"
+    ? {
+        deposit: "30% upfront to reserve capacity and begin discovery",
+        milestonePayments: ["25% after discovery and scope approval", "25% after core milestone approval", "20% before launch or final handover"],
+        finalPayment: "Final handover only after all approved invoices are cleared",
+      }
+    : size === "medium"
+      ? {
+          deposit: "40% upfront",
+          milestonePayments: ["40% after milestone approval", "20% before launch or final delivery"],
+          finalPayment: "20% before launch or final delivery",
+        }
+      : {
+          deposit: "50% upfront",
+          milestonePayments: ["50% before final delivery"],
+          finalPayment: "50% before final delivery",
+        };
+
+  brief.paymentTerms = {
+    ...paymentTerms,
+    structureLabel: "Recommended Payment Structure",
+    deposit: missingDeposit ? recommended.deposit : paymentTerms.deposit,
+    milestonePayments: weakMilestones ? recommended.milestonePayments : paymentTerms.milestonePayments,
+    finalPayment: missingFinal ? recommended.finalPayment : paymentTerms.finalPayment,
+  };
+}
+
+function missingRequirementAdvice(requirement: string): { whyItMatters: string; proposalImpact: string } {
+  const lower = requirement.toLowerCase();
+  if (/budget|payment|commercial|price/.test(lower)) {
+    return {
+      whyItMatters: "Budget defines the feasible scope, phasing, and negotiation position.",
+      proposalImpact: "Without a budget range, the proposal should use phased options and avoid a single fixed commitment.",
+    };
+  }
+  if (/timeline|deadline|launch/.test(lower)) {
+    return {
+      whyItMatters: "Timeline determines delivery sequencing, resourcing, and whether the scope is realistic.",
+      proposalImpact: "The proposal should present a recommended timeline assumption and flag fast-track pricing if urgency is high.",
+    };
+  }
+  if (/technical|architecture|hosting|database|stack|infrastructure/.test(lower)) {
+    return {
+      whyItMatters: "Technical choices affect implementation complexity, operating cost, reliability, and ownership.",
+      proposalImpact: "The proposal should include a discovery or architecture checkpoint before final build pricing.",
+    };
+  }
+  if (/ui|ux|design|brand|guideline|content/.test(lower)) {
+    return {
+      whyItMatters: "Design, content, and brand inputs affect effort, review cycles, and acceptance criteria.",
+      proposalImpact: "The proposal should separate design/content assumptions from development scope.",
+    };
+  }
+  if (/compliance|privacy|security|approval|access/.test(lower)) {
+    return {
+      whyItMatters: "Compliance and security requirements can materially change architecture, testing, and sign-off.",
+      proposalImpact: "The proposal should reserve scope for controls, approvals, and compliance validation.",
+    };
+  }
+  return {
+    whyItMatters: "This detail affects scope boundaries, pricing confidence, or delivery risk.",
+    proposalImpact: "The proposal should label this as an assumption and confirm it before contract sign-off.",
+  };
+}
+
+function enrichMissingRequirements(brief: GeneratedBrief): void {
+  const items = brief.missingRequirements || [];
+  if (items.length === 0) {
+    items.push({
+      requirement: "Acceptance criteria and final sign-off process",
+      priority: "IMPORTANT",
+      ...missingRequirementAdvice("Acceptance criteria and final sign-off process"),
+    });
+  }
+
+  brief.missingRequirements = items
+    .map(item => {
+      const advice = missingRequirementAdvice(item.requirement);
+      return {
+        ...item,
+        whyItMatters: item.whyItMatters || advice.whyItMatters,
+        proposalImpact: item.proposalImpact || advice.proposalImpact,
+      };
+    })
+    .sort((a, b) => {
+      const rank: Record<string, number> = { CRITICAL: 0, IMPORTANT: 1, OPTIONAL: 2 };
+      return (rank[a.priority] ?? 2) - (rank[b.priority] ?? 2);
+    });
+}
+
+function enrichUpsells(brief: GeneratedBrief, category: ReturnType<typeof projectCategory>): void {
+  const upsells = [...(brief.upsellOpportunities || [])];
+
+  function addUpsell(service: string, rationale: string) {
+    if (!upsells.some(item => item.service.toLowerCase() === service.toLowerCase())) {
+      upsells.push({ service, rationale });
+    }
+  }
+
+  if (category === "website") {
+    addUpsell("Maintenance and hosting management", "Website clients often need updates, backups, uptime checks, and vendor coordination after launch.");
+    addUpsell("SEO and conversion optimization package", "A launched website becomes more valuable when search visibility and lead conversion are actively improved.");
+  } else if (category === "saas") {
+    addUpsell("Support and monitoring retainer", "Software products need post-launch issue handling, uptime monitoring, and release support.");
+    addUpsell("Analytics and reporting dashboard", "Usage and conversion data help the client make better product and business decisions after launch.");
+  } else if (category === "marketing") {
+    addUpsell("Campaign reporting package", "Marketing work becomes easier to renew when performance reporting is scoped from the start.");
+    addUpsell("Content production package", "Campaign execution usually needs recurring creative assets beyond strategy.");
+  } else if (category === "branding") {
+    addUpsell("Brand rollout collateral package", "Brand identity work often creates follow-on needs for social templates, decks, print files, and launch assets.");
+    addUpsell("Ongoing design support retainer", "Clients commonly need help applying a new identity across future collateral.");
+  } else {
+    addUpsell("Discovery and scoping workshop", "A paid scoping step reduces estimation risk and creates a stronger proposal.");
+    addUpsell("Post-launch support retainer", "Most projects need stabilization and small improvements after delivery.");
+  }
+
+  brief.upsellOpportunities = upsells
+    .filter(item => hasUsefulText(item.service) && hasUsefulText(item.rationale))
+    .slice(0, 5);
+}
+
+function buildProposalReadySummary(brief: GeneratedBrief): GeneratedBrief["proposalReadySummary"] {
+  const deliverables = (brief.deliverables || []).map(item => item.name).filter(hasUsefulText);
+  const scopeItems = (brief.scopeIncluded || []).filter(hasUsefulText);
+  const assumptions = (brief.assumptions || []).filter(hasUsefulText);
+  const timelineDays = (brief.timeline || []).reduce((sum, item) => sum + (Number.isFinite(item.estimatedDays) ? item.estimatedDays : 0), 0);
+  const timelineRecommendation = timelineDays > 0
+    ? `Plan around approximately ${timelineDays} delivery days across the listed milestones, with scope confirmation before kickoff.`
+    : "Recommend a discovery call first, then present a phased timeline after requirements and approval steps are confirmed.";
+  const pricingRecommendation = hasUsefulText(brief.pricingGuidance?.suggestedFixedPrice)
+    ? `Use ${brief.pricingGuidance.suggestedFixedPrice} as the proposal anchor, with ${brief.pricingGuidance.confidence.toLowerCase()} pricing confidence.`
+    : `Use ${brief.paymentTerms?.structureLabel || "recommended payment terms"} and present pricing after scope, timeline, and budget are confirmed.`;
+
+  return {
+    projectOverview: brief.executiveSummary || brief.projectSummary || "Client project requires proposal scoping before commitment.",
+    likelyDeliverables: deliverables.length > 0
+      ? deliverables.slice(0, 6)
+      : scopeItems.length > 0
+        ? scopeItems.slice(0, 6)
+        : ["Discovery notes, confirmed scope, proposal-ready deliverables, and acceptance criteria"],
+    timelineRecommendation,
+    pricingRecommendation,
+    majorAssumptions: assumptions.length > 0 ? assumptions.slice(0, 5) : ["Scope, timeline, and acceptance criteria will be confirmed before final proposal sign-off."],
+    suggestedEngagementApproach: brief.projectDecision?.action === "Accept with Conditions"
+      ? "Proceed with a phased proposal, keeping assumptions visible and tying each phase to approval milestones."
+      : "Start with a paid or structured discovery step before committing to final pricing and delivery dates.",
+  };
+}
+
+function buildClientWinProbability(brief: GeneratedBrief): GeneratedBrief["clientWinProbability"] {
+  const budgetKnown = hasUsefulText(brief.paymentTerms?.estimatedBudget) || hasUsefulText(brief.budgetRealityCheck?.clientBudget);
+  const timelineKnown = (brief.timeline || []).some(item => item.estimatedDays > 0 || hasUsefulText(item.description));
+  const requirementCount = (brief.scopeIncluded || []).filter(hasUsefulText).length;
+  const criticalMissing = (brief.missingRequirements || []).filter(item => item.priority === "CRITICAL").length;
+  const highRisks = (brief.risks || []).filter(item => item.severity === "high" || item.priority === "CRITICAL").length;
+
+  let probability = 30;
+  if (budgetKnown) probability += 15;
+  if (timelineKnown) probability += 10;
+  probability += Math.min(requirementCount * 4, 20);
+  if (brief.clientRiskScore?.level === "Low") probability += 10;
+  if (brief.projectDecision?.action === "Accept with Conditions") probability += 8;
+  probability -= criticalMissing * 6;
+  probability -= highRisks * 4;
+  probability = Math.max(15, Math.min(90, probability));
+
+  const positives: string[] = [];
+  const concerns: string[] = [];
+  if (budgetKnown) positives.push("Budget or commercial signal is present");
+  else concerns.push("Budget is not confirmed");
+  if (timelineKnown) positives.push("Timeline or delivery structure is available");
+  else concerns.push("Timeline needs confirmation");
+  if (requirementCount > 0) positives.push(`${requirementCount} scoped requirement${requirementCount === 1 ? "" : "s"} identified`);
+  else concerns.push("Requirements are still too vague for confident pricing");
+  if (criticalMissing > 0) concerns.push(`${criticalMissing} critical proposal gap${criticalMissing === 1 ? "" : "s"} remain`);
+
+  return {
+    probability,
+    reasoning: `Estimated from budget realism, timeline clarity, requirement detail, client risk, and remaining critical gaps.`,
+    positiveIndicators: positives.length > 0 ? positives : ["Client has expressed project intent"],
+    concerns: concerns.length > 0 ? concerns : ["No major win blockers detected, but assumptions should still be confirmed"],
+    negotiationAdvice: probability >= 70
+      ? "Move toward a phased proposal with clear exclusions and approval checkpoints."
+      : probability >= 45
+        ? "Use discovery to confirm budget, timeline, and must-have scope before presenting final pricing."
+        : "Do not over-invest in proposal detail until budget, decision urgency, and scope seriousness are confirmed.",
+  };
+}
+
+function buildClientSeriousnessScore(brief: GeneratedBrief): GeneratedBrief["clientSeriousnessScore"] {
+  const signals: string[] = [];
+  let score = 2;
+  if (hasUsefulText(brief.paymentTerms?.estimatedBudget)) { score += 2; signals.push("Budget provided or inferred from client message"); }
+  else signals.push("Budget not yet provided");
+  if ((brief.timeline || []).some(item => item.estimatedDays > 0 || hasUsefulText(item.description))) { score += 1.5; signals.push("Timeline or delivery need is present"); }
+  else signals.push("Timeline not yet provided");
+  const requirementCount = (brief.scopeIncluded || []).filter(hasUsefulText).length;
+  if (requirementCount >= 5) { score += 2; signals.push("Detailed requirement set provided"); }
+  else if (requirementCount > 0) { score += 1; signals.push("Some requirements provided"); }
+  else signals.push("Requirement detail is limited");
+  if (brief.clientTypeClassification && !/unknown/i.test(brief.clientTypeClassification.type)) { score += 1; signals.push(`Client/project type classified as ${brief.clientTypeClassification.type}`); }
+  if (brief.projectDecision?.action === "Accept with Conditions") { score += 1; signals.push("Enough detail exists to proceed with conditions"); }
+
+  const normalized = Math.max(1, Math.min(10, Math.round(score)));
+  return {
+    score: normalized,
+    signals,
+    explanation: `Assigned ${normalized}/10 based on budget signal, timeline signal, requirement detail, business maturity, and proposal readiness.`,
+  };
+}
+
+function enrichConsultantIntelligence(brief: GeneratedBrief, rawInput: string): void {
+  const category = projectCategory(brief, rawInput);
+
+  const existingExclusions = (brief.scopeExcluded || []).filter(hasUsefulText);
+  const exclusions = [...existingExclusions];
+  for (const item of recommendedExclusions(category, rawInput)) addUnique(exclusions, item);
+  brief.scopeExcluded = exclusions.slice(0, 8);
+
+  enrichPaymentTerms(brief);
+  enrichMissingRequirements(brief);
+  enrichUpsells(brief, category);
+
+  brief.proposalReadySummary = brief.proposalReadySummary || buildProposalReadySummary(brief);
+  brief.clientWinProbability = brief.clientWinProbability || buildClientWinProbability(brief);
+  brief.clientSeriousnessScore = brief.clientSeriousnessScore || buildClientSeriousnessScore(brief);
+
+  recordAnalysisInputs({
+    consultantIntelligenceCategory: category,
+    consultantIntelligenceAdded: {
+      exclusions: brief.scopeExcluded.length,
+      paymentStructure: brief.paymentTerms?.structureLabel,
+      missingRequirementImpact: brief.missingRequirements?.filter(item => item.whyItMatters && item.proposalImpact).length || 0,
+      winProbability: brief.clientWinProbability?.probability,
+      seriousnessScore: brief.clientSeriousnessScore?.score,
+    },
+  });
+}
+
 function attachFinalDiagnostics(
   brief: GeneratedBrief,
   rawInput: string,
   consistencyViolations: ConsistencyViolation[],
   verificationPass: DiagnosticInfo["verificationPass"] = { performed: false, inconsistencies: [], resolved: false },
 ): GeneratedBrief {
+  enrichConsultantIntelligence(brief, rawInput);
   const structuralLabelWarnings = sanitizeStructuralLabelEntities(brief);
   const metricWarnings = [...normalizeBriefMetrics(brief), ...validateFinalReportGuards(brief)];
   if (structuralLabelWarnings.length > 0 || metricWarnings.length > 0) {
@@ -1706,6 +2047,9 @@ function attachFinalDiagnostics(
     risks: (brief.risks || []).map(r => r.risk),
     proposalStrategy: (brief.proposalStrategy || []).map(p => ({ name: p.name, items: p.items })),
     discoveryQuestions: (brief.discoveryQuestions || []).map(q => q.question),
+    proposalReadySummary: brief.proposalReadySummary,
+    clientWinProbability: brief.clientWinProbability,
+    clientSeriousnessScore: brief.clientSeriousnessScore,
     extractionWarnings: brief.extractionWarnings || [],
   });
 

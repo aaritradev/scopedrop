@@ -101,6 +101,40 @@ export function exportBriefPDF(brief: GeneratedBrief): jsPDF {
     addBody(brief.projectDecision.reasoning, 9);
   }
 
+  if (brief.proposalReadySummary) {
+    y += 4;
+    addSection("Proposal Ready Summary");
+    addBody(`Overview: ${brief.proposalReadySummary.projectOverview}`, 9, DARK);
+    if (brief.proposalReadySummary.likelyDeliverables.length) {
+      addBody("Likely Deliverables:", 9, DARK);
+      addBullets(brief.proposalReadySummary.likelyDeliverables, 8, "-");
+    }
+    addBody(`Timeline Recommendation: ${brief.proposalReadySummary.timelineRecommendation}`, 8, GRAY);
+    addBody(`Pricing Recommendation: ${brief.proposalReadySummary.pricingRecommendation}`, 8, GRAY);
+    if (brief.proposalReadySummary.majorAssumptions.length) {
+      addBody("Major Assumptions:", 9, DARK);
+      addBullets(brief.proposalReadySummary.majorAssumptions, 8, "-");
+    }
+    addBody(`Engagement Approach: ${brief.proposalReadySummary.suggestedEngagementApproach}`, 8, DARK);
+  }
+
+  if (brief.clientWinProbability || brief.clientSeriousnessScore) {
+    y += 4;
+    addSection("Client Qualification");
+    if (brief.clientWinProbability) {
+      addBody(`Win Probability: ${formatPercentScore(brief.clientWinProbability.probability)}`, 10, DARK);
+      addBody(brief.clientWinProbability.reasoning, 8, GRAY);
+      if (brief.clientWinProbability.positiveIndicators.length) addBullets(brief.clientWinProbability.positiveIndicators, 8, "+");
+      if (brief.clientWinProbability.concerns.length) addBullets(brief.clientWinProbability.concerns, 8, "-");
+      addBody(`Negotiation Advice: ${brief.clientWinProbability.negotiationAdvice}`, 8, DARK);
+    }
+    if (brief.clientSeriousnessScore) {
+      addBody(`Client Seriousness Score: ${formatRatingScore(brief.clientSeriousnessScore.score)}`, 10, DARK);
+      addBody(brief.clientSeriousnessScore.explanation, 8, GRAY);
+      if (brief.clientSeriousnessScore.signals.length) addBullets(brief.clientSeriousnessScore.signals, 8, "-");
+    }
+  }
+
   // Profitability Score
   if (brief.profitabilityScore) {
     y += 4;
@@ -204,6 +238,7 @@ export function exportBriefPDF(brief: GeneratedBrief): jsPDF {
   // Payment
   y += 4;
   addSection("Payment Terms");
+  if (brief.paymentTerms.structureLabel) addBody(brief.paymentTerms.structureLabel, 10, ORANGE);
   addBody(`Estimated Budget: ${brief.paymentTerms.estimatedBudget}`, 9);
   addBody(`Deposit: ${brief.paymentTerms.deposit}`, 9);
   addBullets(brief.paymentTerms.milestonePayments, 9);

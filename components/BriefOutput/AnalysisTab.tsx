@@ -137,6 +137,95 @@ export function AnalysisTab({ brief }: AnalysisTabProps) {
         </Section>
       )}
 
+      {/* Proposal Ready Summary */}
+      {brief.proposalReadySummary && (
+        <Section title="Proposal Ready Summary">
+          <div className="card-base p-5 space-y-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "oklch(0.62 0.14 75)" }}>Project Overview</p>
+              <p className="text-sm leading-relaxed" style={{ color: "oklch(0.82 0.01 260)" }}>{brief.proposalReadySummary.projectOverview}</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg p-3" style={{ backgroundColor: "oklch(0.22 0.035 260 / 0.45)" }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "oklch(0.58 0.01 260)" }}>Likely Deliverables</p>
+                <ul className="space-y-1">
+                  {brief.proposalReadySummary.likelyDeliverables.map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs" style={{ color: "oklch(0.82 0.01 260)" }}>
+                      <span style={{ color: "oklch(0.62 0.14 75)" }}>→</span>{item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-lg p-3" style={{ backgroundColor: "oklch(0.22 0.035 260 / 0.45)" }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "oklch(0.58 0.01 260)" }}>Major Assumptions</p>
+                <ul className="space-y-1">
+                  {brief.proposalReadySummary.majorAssumptions.map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs" style={{ color: "oklch(0.82 0.01 260)" }}>
+                      <span style={{ color: "oklch(0.62 0.14 75)" }}>•</span>{item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "oklch(0.58 0.01 260)" }}>Timeline Recommendation</p>
+                <p className="text-xs leading-relaxed" style={{ color: "oklch(0.82 0.01 260)" }}>{brief.proposalReadySummary.timelineRecommendation}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "oklch(0.58 0.01 260)" }}>Pricing Recommendation</p>
+                <p className="text-xs leading-relaxed" style={{ color: "oklch(0.82 0.01 260)" }}>{brief.proposalReadySummary.pricingRecommendation}</p>
+              </div>
+            </div>
+            <div className="rounded-lg p-3" style={{ backgroundColor: "oklch(0.62 0.14 75 / 0.06)" }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "oklch(0.62 0.14 75)" }}>Suggested Engagement Approach</p>
+              <p className="text-xs leading-relaxed" style={{ color: "oklch(0.82 0.01 260)" }}>{brief.proposalReadySummary.suggestedEngagementApproach}</p>
+            </div>
+          </div>
+        </Section>
+      )}
+
+      {(brief.clientWinProbability || brief.clientSeriousnessScore) && (
+        <Section title="Client Qualification">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {brief.clientWinProbability && (
+              <div className="card-base p-5">
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "oklch(0.58 0.01 260)" }}>Win Probability</p>
+                <p className="text-3xl font-bold tabular mb-2" style={{ color: "oklch(0.93 0.005 260)" }}>{formatPercentScore(brief.clientWinProbability.probability)}</p>
+                <p className="text-xs leading-relaxed mb-3" style={{ color: "oklch(0.58 0.01 260)" }}>{brief.clientWinProbability.reasoning}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "oklch(0.45 0.1 145)" }}>Positive Indicators</p>
+                <ul className="mb-3 space-y-1">
+                  {brief.clientWinProbability.positiveIndicators.map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs" style={{ color: "oklch(0.82 0.01 260)" }}><span style={{ color: "oklch(0.45 0.1 145)" }}>+</span>{item}</li>
+                  ))}
+                </ul>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "oklch(0.6 0.15 25)" }}>Concerns</p>
+                <ul className="mb-3 space-y-1">
+                  {brief.clientWinProbability.concerns.map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs" style={{ color: "oklch(0.82 0.01 260)" }}><span style={{ color: "oklch(0.6 0.15 25)" }}>-</span>{item}</li>
+                  ))}
+                </ul>
+                <p className="text-xs leading-relaxed" style={{ color: "oklch(0.62 0.14 75)" }}>{brief.clientWinProbability.negotiationAdvice}</p>
+              </div>
+            )}
+            {brief.clientSeriousnessScore && (
+              <div className="card-base p-5">
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "oklch(0.58 0.01 260)" }}>Client Seriousness Score</p>
+                <p className="text-3xl font-bold tabular mb-2" style={{ color: "oklch(0.93 0.005 260)" }}>{formatRatingScore(brief.clientSeriousnessScore.score)}</p>
+                <p className="text-xs leading-relaxed mb-3" style={{ color: "oklch(0.58 0.01 260)" }}>{brief.clientSeriousnessScore.explanation}</p>
+                <ul className="space-y-1.5">
+                  {brief.clientSeriousnessScore.signals.map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs" style={{ color: "oklch(0.82 0.01 260)" }}>
+                      <span style={{ color: "oklch(0.62 0.14 75)" }}>•</span>{item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
+
       {/* Profitability Score */}
       {brief.profitabilityScore && (
         <Section title="Profitability Score">
@@ -461,9 +550,21 @@ export function AnalysisTab({ brief }: AnalysisTabProps) {
                 return (order[a.priority || "OPTIONAL"] || 2) - (order[b.priority || "OPTIONAL"] || 2);
               })
               .map((req, i) => (
-                <div key={i} className="card-base flex items-start gap-3 p-3">
-                  <PriorityBadge priority={req.priority} />
-                  <p className="text-sm flex-1" style={{ color: "oklch(0.82 0.01 260)" }}>{req.requirement}</p>
+                <div key={i} className="card-base p-4">
+                  <div className="mb-2 flex items-start gap-3">
+                    <PriorityBadge priority={req.priority} />
+                    <p className="text-sm flex-1 font-medium" style={{ color: "oklch(0.82 0.01 260)" }}>{req.requirement}</p>
+                  </div>
+                  {req.whyItMatters && (
+                    <p className="text-xs leading-relaxed" style={{ color: "oklch(0.58 0.01 260)" }}>
+                      Why it matters: {req.whyItMatters}
+                    </p>
+                  )}
+                  {req.proposalImpact && (
+                    <p className="mt-1 text-xs leading-relaxed" style={{ color: "oklch(0.62 0.14 75)" }}>
+                      Proposal impact: {req.proposalImpact}
+                    </p>
+                  )}
                 </div>
               ))}
           </div>
