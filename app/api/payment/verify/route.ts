@@ -60,14 +60,32 @@ export async function POST(req: NextRequest) {
   }
 
   if (isSubscriptionCheckout) {
-    const { data: subscriptionOwner } = await sb
+    const subscription = await createRazorpayClient().subscriptions.fetch(razorpay_subscription_id);
+    const subscriptionPlanId = typeof subscription?.plan_id === "string" ? subscription.plan_id : null;
+    const subscriptionUserId = typeof subscription?.notes?.user_id === "string" ? subscription.notes.user_id : null;
+
+    const { data: subscriptionOwner, error: subscriptionOwnerError } = await sb
       .from("users")
       .select("id, razorpay_subscription_id")
       .eq("id", user.id)
       .eq("razorpay_subscription_id", razorpay_subscription_id)
-      .single();
+      .maybeSingle();
 
-    if (!subscriptionOwner) {
+    if (
+      subscriptionPlanId !== process.env.RAZORPAY_STARTER_PLAN_ID ||
+      (subscriptionOwner?.id !== user.id && subscriptionUserId !== user.id)
+    ) {
+      console.error("Razorpay subscription ownership mismatch", {
+        subscription_id: razorpay_subscription_id,
+        plan_id: subscriptionPlanId,
+        order_id: razorpay_order_id ?? null,
+        payment_id: razorpay_payment_id ?? null,
+        user_id: user.id,
+        subscription_notes_user_id: subscriptionUserId,
+        database_subscription_owner_id: subscriptionOwner?.id ?? null,
+        database_subscription_lookup_error: subscriptionOwnerError?.message ?? null,
+      });
+
       return NextResponse.json({ error: "Subscription mismatch" }, { status: 403 });
     }
 
@@ -89,7 +107,6 @@ export async function POST(req: NextRequest) {
       .eq("razorpay_subscription_id", razorpay_subscription_id);
 
     try {
-      const subscription = await createRazorpayClient().subscriptions.fetch(razorpay_subscription_id);
       if (subscription?.status === "active") {
         await syncStarterSubscriptionEvent({
           sb,
