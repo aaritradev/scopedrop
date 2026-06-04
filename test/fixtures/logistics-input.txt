@@ -1,0 +1,42 @@
+We are a logistics company currently managing deliveries using WhatsApp, Excel sheets, and phone calls.
+
+We want a platform where:
+- Customers can place delivery requests
+- Drivers can accept jobs
+- Dispatchers can assign deliveries
+- Live GPS tracking
+- Route optimization
+- Proof of delivery
+- Driver earnings tracking
+- Customer notifications
+- Delivery analytics
+
+We also want:
+- Android app for drivers
+- Web dashboard for dispatchers
+- Customer portal
+- Admin panel
+
+Some future features we would like:
+- AI route recommendations
+- Delivery demand forecasting
+- Voice assistant for drivers
+
+We currently have around 200 drivers and expect to grow to 2,000 drivers within 18 months.
+
+The system should work across India.
+
+We need integrations with:
+- WhatsApp
+- SMS
+- Razorpay
+- GST invoicing
+
+We also want drivers to upload documents for verification and compliance.
+
+The platform should support multiple warehouses and regional managers.
+
+Timeline: 5 months
+Budget: ₹15 lakhs
+
+We are currently talking to investors and would like something scalable enough to support future expansion.

@@ -1,0 +1,24 @@
+Hi, we're building a platform called CrewLink that connects event organizers with freelance event staff — photographers, videographers, DJs, makeup artists, and catering teams. Think of it as an Uber for event staff.
+
+Budget: around ₹12 lakhs for the MVP.
+Timeline: 3 months to launch.
+
+We're starting in India and UAE.
+
+Core features needed:
+- User profiles with portfolio uploads for freelancers
+- Gig posting and application system for event organizers
+- Payment processing (need Stripe and Razorpay)
+- Review and rating system for both sides
+- Real-time chat between organizers and freelancers
+- Earnings tracking and payout management for freelancers
+- Worker search and discovery with filters (location, skills, rating)
+- Interview scheduling and instant booking
+- KYC verification for freelancers
+- Admin dashboard for platform management
+- AI-powered recommendations to match the right freelancer to each event
+- Push notifications and email alerts
+
+We also need a website and mobile apps (iOS + Android). Looking for a full-turnkey solution. We have some investor interest and want to show a working demo in 3 months.
+
+What would be the best approach — should we build everything at once or phase it?
