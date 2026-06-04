@@ -2,7 +2,7 @@ import crypto from "crypto";
 import Razorpay from "razorpay";
 import { FREE_MONTHLY_CREDITS, PLAN_CREDITS, PLAN_PRICES, STARTER_MONTHLY_CREDITS, type CheckoutPlan } from "@/lib/billing";
 
-const STARTER_SUBSCRIPTION_TOTAL_COUNT = 1200;
+const STARTER_SUBSCRIPTION_TOTAL_COUNT = 120;
 
 export type RazorpaySubscriptionEntity = {
   id?: string;
