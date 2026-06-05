@@ -9,6 +9,9 @@ interface User {
   picture: string;
   plan: string;
   credits_remaining: number;
+  subscription_status?: string | null;
+  subscription_current_end?: string | null;
+  razorpay_subscription_id?: string | null;
 }
 
 interface AuthContextValue {

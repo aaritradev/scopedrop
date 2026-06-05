@@ -11,6 +11,7 @@ export type RazorpaySubscriptionEntity = {
   current_start?: number | null;
   current_end?: number | null;
   ended_at?: number | null;
+  short_url?: string | null;
   notes?: Record<string, unknown>;
 };
 
@@ -31,6 +32,14 @@ type SyncResult = {
   userId?: string;
   ignored?: boolean;
   reason?: string;
+};
+
+type StarterAccessUser = {
+  id: string;
+  plan?: string | null;
+  credits_remaining?: number | null;
+  subscription_status?: string | null;
+  subscription_current_end?: string | null;
 };
 
 function unixToIso(value: number | null | undefined): string | null {
@@ -130,6 +139,30 @@ function subscriptionUserFields(subscription: RazorpaySubscriptionEntity, status
   };
 }
 
+function hasCurrentPeriodEnded(subscription: RazorpaySubscriptionEntity): boolean {
+  return typeof subscription.current_end !== "number" || subscription.current_end <= Math.floor(Date.now() / 1000);
+}
+
+async function updateStarterSubscriptionStatus(
+  sb: SupabaseServiceClient,
+  userId: string,
+  subscription: RazorpaySubscriptionEntity,
+  statusOverride?: string,
+): Promise<void> {
+  await sb
+    .from("users")
+    .update(subscriptionUserFields(subscription, statusOverride))
+    .eq("id", userId);
+}
+
+export async function markStarterSubscriptionCancellationScheduled(
+  sb: SupabaseServiceClient,
+  userId: string,
+  subscription: RazorpaySubscriptionEntity,
+): Promise<void> {
+  await updateStarterSubscriptionStatus(sb, userId, subscription, "cancelled");
+}
+
 export async function markStarterSubscriptionCreated(
   sb: SupabaseServiceClient,
   userId: string,
@@ -183,6 +216,40 @@ async function downgradeStarterUser(
       credits_remaining: FREE_MONTHLY_CREDITS,
     })
     .eq("id", userId);
+}
+
+export async function reconcileExpiredStarterAccess<T extends StarterAccessUser>(
+  sb: SupabaseServiceClient,
+  user: T,
+): Promise<T> {
+  const expiryStatuses = new Set(["cancelled", "halted", "payment_failed"]);
+  const currentEndMs = user.subscription_current_end ? Date.parse(user.subscription_current_end) : NaN;
+
+  if (
+    user.plan !== "starter" ||
+    !user.subscription_status ||
+    !expiryStatuses.has(user.subscription_status) ||
+    !Number.isFinite(currentEndMs) ||
+    currentEndMs > Date.now()
+  ) {
+    return user;
+  }
+
+  const expiredFields = {
+    plan: "free",
+    credits_remaining: FREE_MONTHLY_CREDITS,
+    subscription_status: "expired",
+  };
+
+  await sb
+    .from("users")
+    .update(expiredFields)
+    .eq("id", user.id);
+
+  return {
+    ...user,
+    ...expiredFields,
+  };
 }
 
 async function recordPaymentEvent(
@@ -289,13 +356,35 @@ export async function syncStarterSubscriptionEvent({
     return { handled: true, userId };
   }
 
-  if (eventType === "subscription.completed" || eventType === "subscription.cancelled") {
+  if (eventType === "subscription.completed") {
     await downgradeStarterUser(sb, userId, subscription, subscription.status ?? eventType.replace("subscription.", ""));
     await recordPaymentEvent(sb, {
       userId,
       plan: "starter",
       amount: payment?.amount ?? 0,
       status: eventType.replace("subscription.", ""),
+      eventType,
+      eventId,
+      payment,
+      subscription,
+    });
+    return { handled: true, userId };
+  }
+
+  if (eventType === "subscription.cancelled" || eventType === "subscription.halted") {
+    const status = eventType.replace("subscription.", "");
+
+    if (hasCurrentPeriodEnded(subscription)) {
+      await downgradeStarterUser(sb, userId, subscription, subscription.status ?? status);
+    } else {
+      await updateStarterSubscriptionStatus(sb, userId, subscription, subscription.status ?? status);
+    }
+
+    await recordPaymentEvent(sb, {
+      userId,
+      plan: "starter",
+      amount: payment?.amount ?? 0,
+      status,
       eventType,
       eventId,
       payment,
@@ -326,14 +415,18 @@ export async function markSubscriptionPaymentFailed({
 
   if (!user?.id) return { handled: false, reason: "unmatched_subscription" };
 
-  await sb
-    .from("users")
-    .update({
-      subscription_status: "payment_failed",
-      plan: "free",
-      credits_remaining: FREE_MONTHLY_CREDITS,
-    })
-    .eq("id", user.id);
+  let subscription: RazorpaySubscriptionEntity = { id: subscriptionId, status: "payment_failed" };
+  try {
+    subscription = await createRazorpayClient().subscriptions.fetch(subscriptionId);
+  } catch (error) {
+    console.error("Razorpay subscription fetch after payment failure failed:", error);
+  }
+
+  if (hasCurrentPeriodEnded(subscription)) {
+    await downgradeStarterUser(sb, user.id, subscription, "payment_failed");
+  } else {
+    await updateStarterSubscriptionStatus(sb, user.id, subscription, "payment_failed");
+  }
 
   await recordPaymentEvent(sb, {
     userId: user.id,
@@ -343,7 +436,7 @@ export async function markSubscriptionPaymentFailed({
     eventType: "payment.failed",
     eventId,
     payment,
-    subscription: { id: subscriptionId, status: "payment_failed" },
+    subscription,
   });
 
   return { handled: true, userId: user.id };

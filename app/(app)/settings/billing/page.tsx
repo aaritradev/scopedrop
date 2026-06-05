@@ -28,6 +28,9 @@ interface MeResponse {
   user?: {
     plan?: "free" | "starter" | "pro";
     credits_remaining?: number;
+    subscription_status?: string | null;
+    subscription_current_end?: string | null;
+    razorpay_subscription_id?: string | null;
   };
 }
 
@@ -35,9 +38,14 @@ function BillingContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const [isBusyPlan, setIsBusyPlan] = useState<string | null>(null);
+  const [isBusyAction, setIsBusyAction] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [currentPlan, setCurrentPlan] = useState<PlanKey>("free");
   const [creditsRemaining, setCreditsRemaining] = useState<number>(0);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [subscriptionCurrentEnd, setSubscriptionCurrentEnd] = useState<string | null>(null);
+  const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
   const canBuyCredits = canPurchaseAdditionalCredits(currentPlan);
 
   async function refreshPlan() {
@@ -46,6 +54,9 @@ function BillingContent() {
       const data = (await res.json()) as MeResponse;
       setCurrentPlan(normalizePlan(data.user?.plan));
       setCreditsRemaining(data.user?.credits_remaining ?? 0);
+      setSubscriptionStatus(data.user?.subscription_status ?? null);
+      setSubscriptionCurrentEnd(data.user?.subscription_current_end ?? null);
+      setSubscriptionId(data.user?.razorpay_subscription_id ?? null);
     } catch {
       // noop
     }
@@ -147,6 +158,77 @@ function BillingContent() {
     }
   }
 
+  function formatDate(value: string | null): string {
+    if (!value) return "—";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "—";
+    return parsed.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" });
+  }
+
+  function formatStatus(value: string | null): string {
+    if (!value) return "Inactive";
+    return value
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  const hasSubscription = !!subscriptionId && currentPlan === "starter";
+  const renewalLabel = formatDate(subscriptionCurrentEnd);
+
+  async function handleManageSubscription() {
+    setMessage(null);
+    if (!hasSubscription) {
+      setMessage("No active subscription found to manage.");
+      return;
+    }
+
+    setIsBusyAction("manage");
+    try {
+      const res = await fetch("/api/payment/manage-subscription", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage(data.error || "Unable to open the subscription portal.");
+        return;
+      }
+
+      if (data.url) {
+        window.open(data.url, "_blank", "noopener,noreferrer");
+      } else {
+        setMessage("Subscription portal is unavailable right now.");
+      }
+    } catch {
+      setMessage("Unable to open the subscription portal.");
+    } finally {
+      setIsBusyAction(null);
+    }
+  }
+
+  async function handleCancelSubscription() {
+    setMessage(null);
+    if (!hasSubscription) {
+      setMessage("No active subscription found to cancel.");
+      return;
+    }
+
+    setIsBusyAction("cancel");
+    try {
+      const res = await fetch("/api/payment/cancel-subscription", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage(data.error || "Unable to cancel subscription.");
+        return;
+      }
+
+      setMessage("Cancellation scheduled. Your Starter plan remains active until the current period ends.");
+      await refreshPlan();
+      setIsCancelOpen(false);
+    } catch {
+      setMessage("Unable to cancel subscription.");
+    } finally {
+      setIsBusyAction(null);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-3xl p-8">
       <div className="mb-8">
@@ -214,6 +296,76 @@ function BillingContent() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-on-surface">
+              Subscription Management
+            </p>
+            <p className="text-xs text-on-surface/55">
+              Manage your Starter subscription details and renewal.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="btn-secondary text-xs"
+              onClick={handleManageSubscription}
+              disabled={!hasSubscription || isBusyAction !== null}
+            >
+              {isBusyAction === "manage" ? "Opening..." : "Manage Subscription"}
+            </button>
+            <button
+              className="btn-secondary text-xs"
+              onClick={() => setIsCancelOpen(true)}
+              disabled={!hasSubscription || subscriptionStatus === "cancelled" || isBusyAction !== null}
+            >
+              Cancel Subscription
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div>
+            <p className="text-[11px] uppercase tracking-wide text-on-surface/45">
+              Current plan
+            </p>
+            <p className="text-sm font-medium text-on-surface">
+              {currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-wide text-on-surface/45">
+              Subscription status
+            </p>
+            <p className="text-sm font-medium text-on-surface">
+              {formatStatus(subscriptionStatus)}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-wide text-on-surface/45">
+              Next renewal date
+            </p>
+            <p className="text-sm font-medium text-on-surface">
+              {renewalLabel}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-wide text-on-surface/45">
+              Subscription ID
+            </p>
+            <p className="text-xs font-medium text-on-surface/70 break-all">
+              {subscriptionId ?? "—"}
+            </p>
+          </div>
+        </div>
+
+        {subscriptionStatus === "cancelled" && (
+          <p className="mt-4 text-xs text-on-surface/70">
+            Subscription cancelled. Your Starter plan remains active until {formatDate(subscriptionCurrentEnd)}.
+          </p>
+        )}
+      </div>
+
+      <div className="card-base mt-6 p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-on-surface">
               Need one extra brief?
             </p>
             <p className="text-xs text-on-surface/55">
@@ -238,6 +390,35 @@ function BillingContent() {
         <p className="mt-4 text-sm text-on-surface/55">
           {message}
         </p>
+      )}
+
+      {isCancelOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="card-base w-full max-w-md p-6">
+            <h2 className="text-base font-semibold text-on-surface">
+              Cancel Subscription
+            </h2>
+            <p className="mt-2 text-sm text-on-surface/70">
+              Your subscription will remain active until the end of your current billing period.After that date, your account will return to the Free plan.
+            </p>
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                className="btn-secondary text-xs"
+                onClick={() => setIsCancelOpen(false)}
+                disabled={isBusyAction !== null}
+              >
+                Keep Subscription
+              </button>
+              <button
+                className="btn-primary text-xs"
+                onClick={handleCancelSubscription}
+                disabled={isBusyAction !== null}
+              >
+                {isBusyAction === "cancel" ? "Cancelling..." : "Cancel at End of Billing Cycle"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="mt-8 flex flex-wrap gap-x-4 gap-y-2 text-xs text-on-surface/45">

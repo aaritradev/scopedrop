@@ -53,7 +53,8 @@ export async function POST(req: NextRequest) {
     eventType === "subscription.activated" ||
     eventType === "subscription.charged" ||
     eventType === "subscription.completed" ||
-    eventType === "subscription.cancelled"
+    eventType === "subscription.cancelled" ||
+    eventType === "subscription.halted"
   ) {
     if (!subscription) {
       return NextResponse.json({ error: "Malformed subscription webhook payload" }, { status: 400 });

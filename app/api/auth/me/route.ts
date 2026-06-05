@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifySession } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
 import { FREE_MONTHLY_CREDITS } from "@/lib/billing";
+import { reconcileExpiredStarterAccess } from "@/lib/razorpayBilling";
 
 export async function GET(req: NextRequest) {
   const token = req.cookies.get("session")?.value;
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
 
   let { data: user } = await sb
     .from("users")
-    .select("id, email, name, avatar_url, plan, credits_remaining")
+    .select("id, email, name, avatar_url, plan, credits_remaining, subscription_status, subscription_current_end, razorpay_subscription_id")
     .eq("provider_user_id", session.sub)
     .single();
 
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
         credits_remaining: FREE_MONTHLY_CREDITS,
         plan: "free",
       })
-      .select("id, email, name, avatar_url, plan, credits_remaining")
+      .select("id, email, name, avatar_url, plan, credits_remaining, subscription_status, subscription_current_end, razorpay_subscription_id")
       .single();
     user = inserted;
   }
@@ -41,6 +42,8 @@ export async function GET(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ user: null });
   }
+
+  user = await reconcileExpiredStarterAccess(sb, user);
 
   return NextResponse.json({
     user: {
@@ -50,6 +53,9 @@ export async function GET(req: NextRequest) {
       picture: user.avatar_url,
       plan: user.plan,
       credits_remaining: user.credits_remaining,
+      subscription_status: user.subscription_status ?? null,
+      subscription_current_end: user.subscription_current_end ?? null,
+      razorpay_subscription_id: user.razorpay_subscription_id ?? null,
     },
   });
 }
