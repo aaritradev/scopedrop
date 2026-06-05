@@ -6,6 +6,7 @@ import {
   createRazorpayClient,
   hasRazorpayBaseConfig,
   markStarterSubscriptionCancellationScheduled,
+  type RazorpaySubscriptionEntity,
 } from "@/lib/razorpayBilling";
 
 function unixToIso(value?: number | null): string | null {
@@ -55,10 +56,20 @@ export async function POST(req: NextRequest) {
 
   try {
     const razorpay = createRazorpayClient();
-    let subscription = await razorpay.subscriptions.cancel(user.razorpay_subscription_id, { cancel_at_cycle_end: 1 });
+    let subscription = await razorpay.subscriptions.cancel(
+      user.razorpay_subscription_id,
+      true,
+    ) as RazorpaySubscriptionEntity;
 
     if (!subscription?.current_end) {
-      subscription = await razorpay.subscriptions.fetch(user.razorpay_subscription_id);
+      subscription = await razorpay.subscriptions.fetch(user.razorpay_subscription_id) as RazorpaySubscriptionEntity;
+    }
+
+    if (typeof subscription.current_end !== "number" && user.subscription_current_end) {
+      const currentEndMs = Date.parse(user.subscription_current_end);
+      if (Number.isFinite(currentEndMs)) {
+        subscription.current_end = Math.floor(currentEndMs / 1000);
+      }
     }
 
     await markStarterSubscriptionCancellationScheduled(sb, user.id, subscription);

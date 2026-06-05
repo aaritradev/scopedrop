@@ -31,6 +31,7 @@ interface MeResponse {
     subscription_status?: string | null;
     subscription_current_end?: string | null;
     razorpay_subscription_id?: string | null;
+    subscription_manage_url?: string | null;
   };
 }
 
@@ -45,6 +46,7 @@ function BillingContent() {
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [subscriptionCurrentEnd, setSubscriptionCurrentEnd] = useState<string | null>(null);
   const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+  const [subscriptionManageUrl, setSubscriptionManageUrl] = useState<string | null>(null);
   const [isCancelOpen, setIsCancelOpen] = useState(false);
   const canBuyCredits = canPurchaseAdditionalCredits(currentPlan);
 
@@ -57,6 +59,7 @@ function BillingContent() {
       setSubscriptionStatus(data.user?.subscription_status ?? null);
       setSubscriptionCurrentEnd(data.user?.subscription_current_end ?? null);
       setSubscriptionId(data.user?.razorpay_subscription_id ?? null);
+      setSubscriptionManageUrl(data.user?.subscription_manage_url ?? null);
     } catch {
       // noop
     }
@@ -159,9 +162,9 @@ function BillingContent() {
   }
 
   function formatDate(value: string | null): string {
-    if (!value) return "—";
+    if (!value) return "-";
     const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return "—";
+    if (Number.isNaN(parsed.getTime())) return "-";
     return parsed.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" });
   }
 
@@ -184,20 +187,13 @@ function BillingContent() {
 
     setIsBusyAction("manage");
     try {
-      const res = await fetch("/api/payment/manage-subscription", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) {
-        setMessage(data.error || "Unable to open the subscription portal.");
-        return;
-      }
-
-      if (data.url) {
-        window.open(data.url, "_blank", "noopener,noreferrer");
+      if (subscriptionManageUrl) {
+        window.open(subscriptionManageUrl, "_blank", "noopener,noreferrer");
       } else {
-        setMessage("Subscription portal is unavailable right now.");
+        setMessage("Manage your payment mandate from your UPI or bank app. You can also cancel future renewals here.");
       }
     } catch {
-      setMessage("Unable to open the subscription portal.");
+      setMessage("Unable to open subscription management.");
     } finally {
       setIsBusyAction(null);
     }
@@ -219,7 +215,7 @@ function BillingContent() {
         return;
       }
 
-      setMessage("Cancellation scheduled. Your Starter plan remains active until the current period ends.");
+      setMessage("Subscription cancelled. Your Starter plan remains active until the end of the billing period.");
       await refreshPlan();
       setIsCancelOpen(false);
     } catch {
@@ -350,7 +346,7 @@ function BillingContent() {
               Subscription ID
             </p>
             <p className="text-xs font-medium text-on-surface/70 break-all">
-              {subscriptionId ?? "—"}
+              {subscriptionId ?? "-"}
             </p>
           </div>
         </div>
@@ -399,7 +395,10 @@ function BillingContent() {
               Cancel Subscription
             </h2>
             <p className="mt-2 text-sm text-on-surface/70">
-              Your subscription will remain active until the end of your current billing period.After that date, your account will return to the Free plan.
+              Your subscription will remain active until the end of your current billing period.
+            </p>
+            <p className="mt-3 text-sm text-on-surface/70">
+              After that date, your account will return to the Free plan.
             </p>
             <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
               <button
