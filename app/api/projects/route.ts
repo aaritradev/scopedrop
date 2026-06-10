@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       client_name: client_name.trim(),
       client_email: client_email?.trim() ?? "",
-      scope_id: scope_id ?? null,
+      scope_id: scope_id || null,
       portal_slug,
       status: "not_started",
     })
@@ -159,7 +159,8 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error || !project) {
-    return NextResponse.json({ error: "Failed to create project" }, { status: 500 });
+    console.error("Project creation error:", error);
+    return NextResponse.json({ error: "Failed to create project", details: error }, { status: 500 });
   }
 
   // Log activity
