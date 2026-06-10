@@ -8,6 +8,7 @@ import { ArrowLeft, Warning } from "@phosphor-icons/react";
 import { GeneratorInput } from "@/components/GeneratorInput";
 import { OutputView } from "@/components/BriefOutput/OutputView";
 import { LoadingState } from "@/components/LoadingState";
+import { CreatePortalModal } from "@/components/CreatePortalModal";
 import { canUseFeature, getFeatureUpgradeMessage } from "@/lib/billing";
 import type { GeneratedBrief } from "@/types/brief";
 
@@ -25,8 +26,10 @@ function GenerateContent() {
   const [initialInput, setInitialInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPortalModal, setShowPortalModal] = useState(false);
   const pendingGenerateStartedRef = useRef(false);
   const canExportPDF = canUseFeature(user?.plan, "pdfExport");
+  const canCreatePortal = canUseFeature(user?.plan, "clientPortal");
   const pdfExportUpgradeMessage = getFeatureUpgradeMessage("pdfExport");
 
   useEffect(() => {
@@ -232,6 +235,9 @@ function GenerateContent() {
               canExportPDF={canExportPDF}
               pdfExportUpgradeMessage={pdfExportUpgradeMessage}
               shareToken={shareToken}
+              canCreatePortal={canCreatePortal}
+              onCreatePortal={() => setShowPortalModal(true)}
+              onPortalUpgrade={() => router.push("/settings/billing")}
             />
             <div className="flex justify-center">
               <motion.button
@@ -247,6 +253,15 @@ function GenerateContent() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {loadedBriefId && (
+        <CreatePortalModal
+          isOpen={showPortalModal}
+          onClose={() => setShowPortalModal(false)}
+          scopeId={loadedBriefId}
+          defaultClientName={brief?.clientName ?? ""}
+        />
+      )}
     </div>
   );
 }

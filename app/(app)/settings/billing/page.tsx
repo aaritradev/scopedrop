@@ -13,6 +13,7 @@ import {
   getFeatureUpgradeMessage,
   normalizePlan,
 } from "@/lib/billing";
+import { detectCurrency, CurrencyInfo } from "@/lib/currency";
 
 declare global {
   interface Window {
@@ -48,6 +49,7 @@ function BillingContent() {
   const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
   const [subscriptionManageUrl, setSubscriptionManageUrl] = useState<string | null>(null);
   const [isCancelOpen, setIsCancelOpen] = useState(false);
+  const [currency, setCurrency] = useState<CurrencyInfo>({ currency: "INR", symbol: "₹", isIndia: true });
   const canBuyCredits = canPurchaseAdditionalCredits(currentPlan);
 
   async function refreshPlan() {
@@ -67,6 +69,7 @@ function BillingContent() {
 
   useEffect(() => {
     refreshPlan();
+    detectCurrency().then(setCurrency);
   }, []);
 
   useEffect(() => {
@@ -255,7 +258,7 @@ function BillingContent() {
               )}
             </div>
             <p className="tabular mt-1 text-2xl font-bold text-on-surface">
-              {plan.priceLabel}
+              {currency.isIndia ? plan.priceINRLabel : plan.priceUSDLabel}
             </p>
             <p className="text-xs mt-0.5 text-on-surface/55">
               {plan.creditsLabel}

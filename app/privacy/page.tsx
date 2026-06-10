@@ -12,7 +12,7 @@ const sections = [
   {
     title: "Overview",
     body: [
-      "ScopeDrop is an AI-powered project scoping and proposal intelligence platform. This Privacy Policy explains how we collect, use, store, and protect information when you use ScopeDrop, including AI brief analysis, discovery questions, proposal readiness scoring, PDF exports, user accounts, Google OAuth, Razorpay subscriptions, and credit-based usage.",
+      "ScopeDrop is an AI-powered project scoping and proposal intelligence platform. This Privacy Policy explains how we collect, use, store, and protect information when you use ScopeDrop, including AI brief analysis, client portals, file sharing, invoice tracking, PDF exports, user accounts, Google OAuth, Razorpay subscriptions, and credit-based usage.",
       "By using ScopeDrop, you agree that we may process information as described in this Privacy Policy.",
     ],
   },
@@ -23,6 +23,7 @@ const sections = [
       "Google OAuth data, such as your Google account identifier, email address, display name, and profile image when you choose to sign in with Google.",
       "Project brief content that you paste or upload into ScopeDrop, including client messages, meeting notes, requirements, budgets, timelines, and related project context.",
       "Generated reports, including project briefs, discovery questions, proposal readiness analysis, risks, scope items, payment terms, PDF exports, and edited report content.",
+      "Client portal data, including files uploaded by you or your clients, invoice records, payment details shared for manual collection, and portal activity logs.",
       "Usage data, such as pages visited, features used, generation attempts, credits consumed, export activity, authentication events, subscription events, and operational logs.",
       "Payment and subscription metadata, such as Razorpay order IDs, payment IDs, subscription IDs, invoice IDs, plan type, payment status, and webhook events.",
       "Device and technical data, such as IP address, browser type, device type, operating system, referring pages, cookies, session identifiers, and security logs.",

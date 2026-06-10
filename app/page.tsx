@@ -6,6 +6,7 @@ import { Sparkle, ArrowRight, SealCheck, Files, Robot, CurrencyDollar, Lightning
 import { Nav } from "@/components/layout/Nav";
 import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/contexts/AuthContext";
+import { detectCurrency, formatPrice, CurrencyInfo } from "@/lib/currency";
 
 const PENDING_BRIEF_INPUT_KEY = "scopedrop.pendingBriefInput";
 const PENDING_BRIEF_AUTO_GENERATE_KEY = "scopedrop.pendingBriefAutoGenerate";
@@ -43,7 +44,12 @@ export default function LandingPage() {
   const [showPlaceholder, setShowPlaceholder] = useState(true);
   const [isGeneratingCompare, setIsGeneratingCompare] = useState(false);
   const [isCompareReady, setIsCompareReady] = useState(false);
+  const [currency, setCurrency] = useState<CurrencyInfo>({ currency: "INR", symbol: "₹", isIndia: true });
   const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    detectCurrency().then(setCurrency);
+  }, []);
 
   const handleDemo = useCallback(() => {
     if (input.length < 20) return;
@@ -150,7 +156,7 @@ export default function LandingPage() {
               </div>
 
               <h1 className="font-display-lg text-display-lg-mobile md:text-display-lg leading-none text-on-surface">
-                Turn client chaos into <span className="text-primary">signed contracts.</span>
+                Turn client chaos into <span className="text-primary">paid invoices.</span>
               </h1>
 
               <p className="font-body-lg text-body-lg text-on-surface/60 max-w-xl">
@@ -253,7 +259,7 @@ export default function LandingPage() {
             {[
               { step: "01", icon: <Files size={28} weight="duotone" className="text-primary" />, title: "Paste client conversation", desc: "Drop in any client email, WhatsApp chat, Slack thread, or meeting notes. No cleanup needed.", delay: "0.2s" },
               { step: "02", icon: <Robot size={28} weight="duotone" className="text-primary" />, title: "ScopeDrop builds your brief", desc: "ScopeDrop analyzes the message and generates a complete brief with scope, deliverables, timeline, payment terms, and red flags.", delay: "0.4s" },
-              { step: "03", icon: <CurrencyDollar size={28} weight="duotone" className="text-primary" />, title: "Review, send, and close", desc: "Make quick edits, export PDF, or share a link with payment terms so you can move to sign-off faster.", delay: "0.6s" },
+              { step: "03", icon: <CurrencyDollar size={28} weight="duotone" className="text-primary" />, title: "Share portal & get paid", desc: "Generate a secure client portal with one click. Get scope approval, collect files, and get paid directly.", delay: "0.6s" },
             ].map((item) => (
               <div key={item.step} className="reveal-up group" style={{ transitionDelay: `${parseInt(item.step) * 100}ms` }}>
                 <div className="glass-card p-8 rounded-[32px] h-full relative overflow-hidden group-hover:border-primary/30 transition-all duration-500 animate-float" style={{ animationDelay: item.delay }}>
@@ -360,7 +366,7 @@ export default function LandingPage() {
               <div className="glass-card p-8 rounded-[32px] border-white/5 hover:border-white/10 transition-colors animate-float" style={{ animationDelay: "-0.5s" }}>
                 <p className="font-headline-lg text-xl mb-2 text-on-surface">Free</p>
                 <div className="flex items-baseline gap-1 mb-6">
-                  <span className="tabular text-4xl font-bold text-on-surface">₹0</span>
+                  <span className="tabular text-4xl font-bold text-on-surface">{formatPrice(0, currency.currency)}</span>
                 </div>
                 <p className="text-on-surface/40 text-sm mb-8">3 briefs/month</p>
                 <ul className="space-y-4 mb-10">
@@ -385,16 +391,16 @@ export default function LandingPage() {
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-on-primary px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest z-10 shadow-lg shadow-primary/20">Recommended</div>
                 <p className="font-headline-lg text-xl mb-2 text-on-surface">Starter</p>
                 <div className="flex items-baseline gap-1 mb-6">
-                  <span className="tabular text-4xl font-bold text-on-surface">₹299</span>
+                  <span className="tabular text-4xl font-bold text-on-surface">{formatPrice(currency.isIndia ? 49900 : 999, currency.currency)}</span>
                   <span className="text-on-surface/40">/mo</span>
                 </div>
-                <p className="text-on-surface/40 text-sm mb-8">20 briefs/month</p>
+                <p className="text-on-surface/40 text-sm mb-8">Unlimited briefs & projects</p>
                 <ul className="space-y-4 mb-10">
                   <li className="flex items-center gap-3 text-sm text-on-surface/70"><Check size={16} weight="bold" className="text-primary" /> Everything in Free</li>
+                  <li className="flex items-center gap-3 text-sm text-on-surface/70"><Check size={16} weight="bold" className="text-primary" /> Create Client Portals</li>
+                  <li className="flex items-center gap-3 text-sm text-on-surface/70"><Check size={16} weight="bold" className="text-primary" /> Invoice Tracking</li>
+                  <li className="flex items-center gap-3 text-sm text-on-surface/70"><Check size={16} weight="bold" className="text-primary" /> File Collection</li>
                   <li className="flex items-center gap-3 text-sm text-on-surface/70"><Check size={16} weight="bold" className="text-primary" /> PDF Export</li>
-                  <li className="flex items-center gap-3 text-sm text-on-surface/70"><Check size={16} weight="bold" className="text-primary" /> Full Brief History</li>
-                  <li className="flex items-center gap-3 text-sm text-on-surface/70"><Check size={16} weight="bold" className="text-primary" /> Priority Processing</li>
-                  <li className="flex items-center gap-3 text-sm text-on-surface/70"><Check size={16} weight="bold" className="text-primary" /> Additional Credit Purchases</li>
                 </ul>
                 <button
                   onClick={() => handlePricingClick("starter")}
@@ -411,7 +417,7 @@ export default function LandingPage() {
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-on-primary px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest z-10 shadow-lg shadow-primary/20">Launching Soon</div>
                 <p className="font-headline-lg text-xl mb-2 text-on-surface">Pro</p>
                 <div className="flex items-baseline gap-1 mb-6">
-                  <span className="tabular text-5xl font-bold text-on-surface">₹799</span>
+                  <span className="tabular text-5xl font-bold text-on-surface">{formatPrice(currency.isIndia ? 99900 : 1999, currency.currency)}</span>
                   <span className="text-on-surface/40">/mo</span>
                 </div>
                 <p className="text-on-surface/40 text-sm mb-8">Unlimited briefs</p>

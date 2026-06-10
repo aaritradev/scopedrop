@@ -12,6 +12,7 @@ const protectedPaths = [
 const apiProtectedPaths = [
   "/api/generate",
   "/api/briefs",
+  "/api/projects",
   "/api/payment/create-order",
   "/api/payment/verify",
 ];
@@ -51,6 +52,7 @@ export const config = {
     "/briefs/:path*",
     "/api/generate",
     "/api/briefs/:path*",
+    "/api/projects/:path*",
     "/api/payment/create-order",
     "/api/payment/verify",
   ],

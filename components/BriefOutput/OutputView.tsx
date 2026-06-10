@@ -32,6 +32,9 @@ interface OutputViewProps {
   canExportPDF?: boolean;
   pdfExportUpgradeMessage?: string;
   shareToken?: string | null;
+  onCreatePortal?: () => void;
+  onPortalUpgrade?: () => void;
+  canCreatePortal?: boolean;
 }
 
 export function OutputView({
@@ -45,6 +48,9 @@ export function OutputView({
   canExportPDF = true,
   pdfExportUpgradeMessage,
   shareToken,
+  onCreatePortal,
+  onPortalUpgrade,
+  canCreatePortal = false,
 }: OutputViewProps) {
   const [activeTab, setActiveTab] = useState<TabId>("brief");
   const [isSaving, setIsSaving] = useState(false);
@@ -183,6 +189,25 @@ export function OutputView({
           </button>
         )}
       </div>
+
+      {(onCreatePortal || onPortalUpgrade) && (
+        <div className="border-t px-6 py-4 flex items-center justify-between" style={{ borderColor: "oklch(0.22 0.035 260)", backgroundColor: "oklch(0.62 0.14 75 / 0.04)" }}>
+          <div>
+            <p className="text-sm font-bold" style={{ color: "oklch(0.93 0.005 260)" }}>
+              Client Portal
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: "oklch(0.58 0.01 260)" }}>
+              Share this scope, collect files, and get paid via a single link.
+            </p>
+          </div>
+          <button
+            onClick={canCreatePortal ? onCreatePortal : onPortalUpgrade}
+            className="btn-primary text-xs shrink-0"
+          >
+            {canCreatePortal ? "Create Client Portal" : "Upgrade to Share with Client"}
+          </button>
+        </div>
+      )}
 
       {onExportPDF && !canExportPDF && pdfExportUpgradeMessage && (
         <p className="border-t px-6 py-3 text-xs text-on-surface/55" style={{ borderColor: "oklch(0.22 0.035 260)" }}>

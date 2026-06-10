@@ -51,7 +51,7 @@ const sections = [
   {
     title: "Subscriptions and Billing",
     body: [
-      "ScopeDrop offers paid subscriptions through Razorpay. The Starter plan is INR 299 per month and includes 20 brief credits per billing cycle. Subscription availability, pricing, features, and plan limits may change over time, but changes will not reduce the features of an active paid period without reasonable notice.",
+      "ScopeDrop offers paid subscriptions through Razorpay. The Starter plan is INR 499 per month. Subscription availability, pricing, features, and plan limits may change over time, but changes will not reduce the features of an active paid period without reasonable notice.",
       "By subscribing, you authorize Razorpay to process recurring subscription payments according to the plan you select. Your plan may remain active only while payment is successful and the subscription is active. If a renewal fails, is cancelled, is completed, or is otherwise not active, ScopeDrop may downgrade your account or limit paid features.",
     ],
   },
@@ -59,7 +59,7 @@ const sections = [
     title: "Credit System",
     body: [
       "ScopeDrop uses credits to control report generation usage. A credit is consumed only when a report is successfully generated and saved. Failed AI provider calls, invalid responses, timeout failures, network failures, report validation failures, and database save failures should not consume credits.",
-      "Free accounts receive a limited monthly allowance. Starter accounts receive 20 credits per billing cycle. Additional single-credit purchases may be available to eligible paid users. Credits are account-specific, non-transferable, and may expire or reset according to the applicable plan rules.",
+      "Free accounts receive a limited monthly allowance. Starter and Pro accounts receive unlimited briefs. Credits are account-specific, non-transferable, and may expire or reset according to the applicable plan rules.",
     ],
   },
   {
@@ -94,6 +94,13 @@ const sections = [
     body: [
       "You may stop using ScopeDrop at any time. ScopeDrop may suspend or terminate access if you violate these Terms, create security or abuse risk, fail to pay subscription fees, misuse credits, infringe rights, or use the service in a way that may harm ScopeDrop, users, providers, or third parties.",
       "Termination may result in loss of access to paid features, generated reports, brief history, credits, exports, and account data, subject to applicable retention and deletion practices.",
+    ],
+  },
+  {
+    title: "Client Portals and Payments",
+    body: [
+      "ScopeDrop provides tools to generate scope documents and manage client portals (including file sharing and invoice tracking). ScopeDrop does not act as a payment gateway, payment processor, or escrow service for payments between freelancers and their clients.",
+      "Freelancers must use their own payment methods (such as UPI or bank transfers) to collect payments directly from their clients outside of the ScopeDrop platform. ScopeDrop is not responsible for any payment disputes, chargebacks, unpaid invoices, or transaction failures between users and their clients.",
     ],
   },
   {

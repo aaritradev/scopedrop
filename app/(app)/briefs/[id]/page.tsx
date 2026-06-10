@@ -15,6 +15,7 @@ import {
   DotsThree,
 } from "@phosphor-icons/react";
 import { OutputView } from "@/components/BriefOutput/OutputView";
+import { CreatePortalModal } from "@/components/CreatePortalModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { canUseFeature, getFeatureUpgradeMessage } from "@/lib/billing";
 import type { GeneratedBrief } from "@/types/brief";
@@ -52,7 +53,9 @@ export default function BriefDetailPage() {
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showPortalModal, setShowPortalModal] = useState(false);
   const canExportPDF = canUseFeature(user?.plan, "pdfExport");
+  const canCreatePortal = canUseFeature(user?.plan, "clientPortal");
   const pdfExportUpgradeMessage = getFeatureUpgradeMessage("pdfExport");
 
   const fetchBrief = useCallback(async () => {
@@ -258,6 +261,16 @@ export default function BriefDetailPage() {
         onPDFUpgrade={() => router.push("/settings/billing")}
         canExportPDF={canExportPDF}
         pdfExportUpgradeMessage={pdfExportUpgradeMessage}
+        canCreatePortal={canCreatePortal}
+        onCreatePortal={() => setShowPortalModal(true)}
+        onPortalUpgrade={() => router.push("/settings/billing")}
+      />
+
+      <CreatePortalModal
+        isOpen={showPortalModal}
+        onClose={() => setShowPortalModal(false)}
+        scopeId={brief.id}
+        defaultClientName={brief.client_name}
       />
     </div>
   );
