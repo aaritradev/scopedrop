@@ -259,26 +259,54 @@ export default function ProjectDetailPage() {
                   {uploadError && <p className="text-xs text-red-400 mt-2">{uploadError}</p>}
                 </div>
 
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-on-surface uppercase tracking-wider mb-4">Project Files</h3>
-                  {(!project.portal_files || project.portal_files.length === 0) && (
-                    <p className="text-sm text-on-surface/40">No files uploaded yet.</p>
-                  )}
-                  {project.portal_files?.map((f: any) => (
-                    <div key={f.id} className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/[0.02]">
-                      <div className="flex flex-col min-w-0 pr-4">
-                        <span className="text-sm font-medium text-on-surface truncate">{f.file_name}</span>
-                        <span className="text-xs text-on-surface/40 mt-0.5">
-                          Uploaded by {f.uploaded_by} · {new Date(f.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                      {f.signed_url && (
-                        <a href={f.signed_url} download className="p-2 rounded-lg bg-white/5 hover:bg-white/10 shrink-0">
-                          <DownloadSimple size={16} />
-                        </a>
-                      )}
-                    </div>
-                  ))}
+                <div className="space-y-8 mt-8">
+                  {/* Shared with you (Client's files) */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-on-surface uppercase tracking-wider mb-4">Shared with you</h3>
+                    {(!project.portal_files || !project.portal_files.some((f: any) => f.uploaded_by === "client")) ? (
+                      <p className="text-sm text-on-surface/40">No files shared by the client yet.</p>
+                    ) : (
+                      project.portal_files.filter((f: any) => f.uploaded_by === "client").map((f: any) => (
+                        <div key={f.id} className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                          <div className="flex flex-col min-w-0 pr-4">
+                            <span className="text-sm font-medium text-on-surface truncate">{f.file_name}</span>
+                            <span className="text-xs text-on-surface/40 mt-0.5">
+                              {new Date(f.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {f.signed_url && (
+                            <a href={f.signed_url} download className="p-2 rounded-lg bg-white/5 hover:bg-white/10 shrink-0">
+                              <DownloadSimple size={16} />
+                            </a>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* You sent (Freelancer's files) */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-on-surface uppercase tracking-wider mb-4">You sent</h3>
+                    {(!project.portal_files || !project.portal_files.some((f: any) => f.uploaded_by === "freelancer")) ? (
+                      <p className="text-sm text-on-surface/40">You haven't sent any files yet.</p>
+                    ) : (
+                      project.portal_files.filter((f: any) => f.uploaded_by === "freelancer").map((f: any) => (
+                        <div key={f.id} className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                          <div className="flex flex-col min-w-0 pr-4">
+                            <span className="text-sm font-medium text-on-surface truncate">{f.file_name}</span>
+                            <span className="text-xs text-on-surface/40 mt-0.5">
+                              {new Date(f.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {f.signed_url && (
+                            <a href={f.signed_url} download className="p-2 rounded-lg bg-white/5 hover:bg-white/10 shrink-0">
+                              <DownloadSimple size={16} />
+                            </a>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             )}

@@ -46,7 +46,23 @@ export async function GET(
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ project });
+  // Generate signed URLs for all files (valid for 7 days)
+  const files = (project.portal_files ?? []) as any[];
+  const filesWithUrls = await Promise.all(
+    files.map(async (f) => {
+      const { data } = await sb.storage
+        .from("project-files")
+        .createSignedUrl(f.file_url, 60 * 60 * 24 * 7); // 7 days
+      return { ...f, signed_url: data?.signedUrl ?? null };
+    })
+  );
+
+  return NextResponse.json({ 
+    project: {
+      ...project,
+      portal_files: filesWithUrls
+    }
+  });
 }
 
 // PATCH /api/projects/[id] — update project status

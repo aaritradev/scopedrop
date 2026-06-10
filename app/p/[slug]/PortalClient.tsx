@@ -278,22 +278,50 @@ export function PortalClient({ slug }: { slug: string }) {
               {uploadError && <p className="text-xs text-red-400 mt-2">{uploadError}</p>}
             </div>
 
-            <div className="space-y-3">
-              {data.portal_files?.map((f: any) => (
-                <div key={f.id} className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/[0.02]">
-                  <div className="flex flex-col min-w-0 pr-4">
-                    <span className="text-sm font-medium text-on-surface truncate">{f.file_name}</span>
-                    <span className="text-xs text-on-surface/40 mt-0.5">
-                      Uploaded by {f.uploaded_by} · {new Date(f.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  {f.signed_url && (
-                    <a href={f.signed_url} download className="p-2 rounded-lg bg-white/5 hover:bg-white/10 shrink-0 text-primary">
-                      <DownloadSimple size={18} />
-                    </a>
-                  )}
-                </div>
-              ))}
+            <div className="space-y-8 mt-2">
+              {/* You sent */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-semibold text-on-surface/50 uppercase tracking-wider">You sent</h3>
+                {(!data.portal_files || !data.portal_files.some((f: any) => f.uploaded_by === "client")) ? (
+                  <p className="text-sm text-on-surface/40">You haven't uploaded any files yet.</p>
+                ) : (
+                  data.portal_files.filter((f: any) => f.uploaded_by === "client").map((f: any) => (
+                    <div key={f.id} className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                      <div className="flex flex-col min-w-0 pr-4">
+                        <span className="text-sm font-medium text-on-surface truncate">{f.file_name}</span>
+                        <span className="text-xs text-on-surface/40 mt-0.5">{new Date(f.created_at).toLocaleDateString()}</span>
+                      </div>
+                      {f.signed_url && (
+                        <a href={f.signed_url} download className="p-2 rounded-lg bg-white/5 hover:bg-white/10 shrink-0 text-on-surface/60">
+                          <DownloadSimple size={16} />
+                        </a>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Shared with you (from freelancer) */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-semibold text-on-surface/50 uppercase tracking-wider">Shared with you</h3>
+                {(!data.portal_files || !data.portal_files.some((f: any) => f.uploaded_by === "freelancer")) ? (
+                  <p className="text-sm text-on-surface/40">No files shared by {data.freelancer_name} yet.</p>
+                ) : (
+                  data.portal_files.filter((f: any) => f.uploaded_by === "freelancer").map((f: any) => (
+                    <div key={f.id} className="flex items-center justify-between p-4 rounded-xl border border-primary/10 bg-primary/[0.03]">
+                      <div className="flex flex-col min-w-0 pr-4">
+                        <span className="text-sm font-medium text-on-surface truncate">{f.file_name}</span>
+                        <span className="text-xs text-on-surface/40 mt-0.5">{new Date(f.created_at).toLocaleDateString()}</span>
+                      </div>
+                      {f.signed_url && (
+                        <a href={f.signed_url} download className="p-2 rounded-lg bg-primary/10 hover:bg-primary/20 shrink-0 text-primary">
+                          <DownloadSimple size={16} />
+                        </a>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </section>
 
