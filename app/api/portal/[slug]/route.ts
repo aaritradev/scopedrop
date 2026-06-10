@@ -50,16 +50,16 @@ export async function GET(
   );
 
   // Log scope_viewed activity (fire and forget)
-  sb.from("portal_activity")
-    .insert({
+  Promise.resolve(
+    sb.from("portal_activity").insert({
       project_id: project.id,
       event: "scope_viewed",
       actor: "client",
     })
-    .then(() => {})
-    .catch(() => {});
+  ).catch(() => {});
 
-  const freelancerName = (project.users as { name: string } | null)?.name ?? "Your freelancer";
+  const users = project.users as any;
+  const freelancerName = (Array.isArray(users) ? users[0]?.name : users?.name) ?? "Your freelancer";
 
   return NextResponse.json({
     project: {
