@@ -168,7 +168,10 @@ export function PortalClient({ slug }: { slug: string }) {
   }
 
   const isApproved = data.portal_activity?.some((a: any) => a.event === "scope_approved");
-  const invoice = data.invoices?.find((i: any) => i.status === "unpaid") || data.invoices?.[0];
+  const sortedInvoices = [...(data.invoices || [])].sort(
+    (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+  const latestInvoice = sortedInvoices[0] ?? null;
 
   return (
     <div className="min-h-screen bg-[#121315] text-[#e3e2e5]">
@@ -329,53 +332,81 @@ export function PortalClient({ slug }: { slug: string }) {
           <section className="space-y-6">
             <h2 className="text-xl font-bold text-on-surface">Payment & Invoice</h2>
             
-            {!invoice ? (
+            {!latestInvoice ? (
               <div className="card-base p-8 text-center border border-white/5">
                 <ShieldCheck size={32} className="mx-auto text-on-surface/30 mb-3" />
-                <p className="text-sm text-on-surface/55">No pending invoices for this project.</p>
+                <p className="text-sm text-on-surface/55">No invoices for this project yet.</p>
               </div>
             ) : (
-              <motion.div 
-                className={`card-base p-6 border ${invoice.status === 'paid' ? 'border-emerald-500/20' : 'border-primary/20'}`}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <h3 className="text-sm font-semibold text-on-surface uppercase tracking-wider mb-1">Current Invoice</h3>
-                    <p className="text-xs text-on-surface/50">Requested {new Date(invoice.created_at).toLocaleDateString()}</p>
+              <div className="space-y-4">
+                {/* Latest Invoice */}
+                <motion.div 
+                  className={`card-base p-6 border ${latestInvoice.status === 'paid' ? 'border-emerald-500/20' : 'border-primary/20'}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <h3 className="text-sm font-semibold text-on-surface uppercase tracking-wider mb-1">
+                        {latestInvoice.status === "unpaid" ? "Payment Due" : "Latest Invoice"}
+                      </h3>
+                      <p className="text-xs text-on-surface/50">Requested {new Date(latestInvoice.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <div className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded ${
+                      latestInvoice.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-primary/10 text-primary'
+                    }`}>
+                      {latestInvoice.status}
+                    </div>
                   </div>
-                  <div className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded ${
-                    invoice.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-primary/10 text-primary'
-                  }`}>
-                    {invoice.status}
+                  
+                  <div className="text-4xl font-bold tabular mb-6 text-on-surface">
+                    {formatPrice(latestInvoice.amount, latestInvoice.currency as any)}
                   </div>
-                </div>
-                
-                <div className="text-4xl font-bold tabular mb-6 text-on-surface">
-                  {formatPrice(invoice.amount, invoice.currency as any)}
-                </div>
-                
-                <div className="bg-black/30 rounded-xl p-5 mb-6 border border-white/5">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-on-surface/50 mb-3">Payment Instructions</p>
-                  <p className="text-sm text-on-surface whitespace-pre-wrap">{invoice.payment_details}</p>
-                </div>
+                  
+                  <div className="bg-black/30 rounded-xl p-5 mb-6 border border-white/5">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-on-surface/50 mb-3">Payment Instructions</p>
+                    <p className="text-sm text-on-surface whitespace-pre-wrap">{latestInvoice.payment_details}</p>
+                  </div>
 
-                {invoice.status === "unpaid" ? (
-                  <button 
-                    onClick={() => handleMarkPaid(invoice.id)}
-                    disabled={paying}
-                    className="btn-primary w-full justify-center h-12"
-                  >
-                    {paying ? "Updating..." : "I have made the payment"}
-                  </button>
-                ) : (
-                  <div className="flex items-center justify-center gap-2 text-sm font-medium text-emerald-400 bg-emerald-500/10 py-3 rounded-xl border border-emerald-500/20">
-                    <CheckCircle size={18} weight="fill" />
-                    Payment Confirmed
+                  {latestInvoice.status === "unpaid" ? (
+                    <button 
+                      onClick={() => handleMarkPaid(latestInvoice.id)}
+                      disabled={paying}
+                      className="btn-primary w-full justify-center h-12"
+                    >
+                      {paying ? "Updating..." : "I have made the payment"}
+                    </button>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2 text-sm font-medium text-emerald-400 bg-emerald-500/10 py-3 rounded-xl border border-emerald-500/20">
+                      <CheckCircle size={18} weight="fill" />
+                      Payment Confirmed
+                    </div>
+                  )}
+                </motion.div>
+
+                {/* Invoice History */}
+                {sortedInvoices.length > 1 && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold text-on-surface/50 uppercase tracking-wider">Payment History</h3>
+                    {sortedInvoices.slice(1).map((inv: any) => (
+                      <div key={inv.id} className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                        <div>
+                          <p className="text-sm font-medium text-on-surface">{formatPrice(inv.amount, inv.currency as any)}</p>
+                          <p className="text-xs text-on-surface/40 mt-0.5">{new Date(inv.created_at).toLocaleDateString()}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {inv.status === 'paid' && <CheckCircle size={14} className="text-emerald-400" weight="fill" />}
+                          <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded ${
+                            inv.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-primary/10 text-primary'
+                          }`}>
+                            {inv.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
-              </motion.div>
+              </div>
             )}
           </section>
         </div>
