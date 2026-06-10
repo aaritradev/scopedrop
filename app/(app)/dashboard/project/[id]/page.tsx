@@ -192,7 +192,11 @@ export default function ProjectDetailPage() {
 
   if (!project) return null;
 
-  const currentInvoice = project.invoices?.find((i: any) => i.status === "unpaid") || project.invoices?.[0];
+  const sortedInvoices = [...(project.invoices || [])].sort(
+    (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+  const latestInvoice = sortedInvoices[0] ?? null;
+  const hasUnpaidInvoice = sortedInvoices.some((i: any) => i.status === "unpaid");
   const hasApprovedActivity = project.portal_activity?.some((a: any) => a.event === "scope_approved");
 
   return (
@@ -353,7 +357,8 @@ export default function ProjectDetailPage() {
 
             {activeTab === "invoice" && (
               <div className="space-y-6">
-                {!currentInvoice || currentInvoice.status === "paid" ? (
+                {/* Create Invoice Form — only show when no active unpaid invoice */}
+                {!hasUnpaidInvoice && (
                   <form onSubmit={handleCreateInvoice} className="card-base p-6 space-y-4">
                     <h3 className="text-sm font-semibold text-on-surface uppercase tracking-wider mb-2">Create New Invoice</h3>
                     
@@ -417,39 +422,64 @@ export default function ProjectDetailPage() {
                       {isCreatingInvoice ? "Creating..." : "Generate Invoice Request"}
                     </button>
                   </form>
-                ) : null}
+                )}
 
-                {currentInvoice && (
-                  <div className={`card-base p-6 border ${currentInvoice.status === 'paid' ? 'border-emerald-500/20' : 'border-amber-500/20'}`}>
+                {/* Latest / Active Invoice */}
+                {latestInvoice && (
+                  <div className={`card-base p-6 border ${
+                    latestInvoice.status === 'paid' ? 'border-emerald-500/20' : 'border-amber-500/20'
+                  }`}>
                     <div className="flex justify-between items-start mb-6">
                       <div>
-                        <h3 className="text-sm font-semibold text-on-surface uppercase tracking-wider mb-1">Current Invoice</h3>
-                        <p className="text-xs text-on-surface/50">Created on {new Date(currentInvoice.created_at).toLocaleDateString()}</p>
+                        <h3 className="text-sm font-semibold text-on-surface uppercase tracking-wider mb-1">
+                          {latestInvoice.status === "unpaid" ? "Active Invoice" : "Latest Invoice"}
+                        </h3>
+                        <p className="text-xs text-on-surface/50">Created on {new Date(latestInvoice.created_at).toLocaleDateString()}</p>
                       </div>
                       <div className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded ${
-                        currentInvoice.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                        latestInvoice.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
                       }`}>
-                        {currentInvoice.status}
+                        {latestInvoice.status}
                       </div>
                     </div>
                     
                     <div className="text-3xl font-bold tabular mb-4">
-                      {formatPrice(currentInvoice.amount, currentInvoice.currency as any)}
+                      {formatPrice(latestInvoice.amount, latestInvoice.currency as any)}
                     </div>
                     
                     <div className="bg-black/20 rounded-lg p-4 mb-6">
                       <p className="text-xs text-on-surface/50 mb-1">Payment Details Provided:</p>
-                      <p className="text-sm font-medium whitespace-pre-wrap">{currentInvoice.payment_details}</p>
+                      <p className="text-sm font-medium whitespace-pre-wrap">{latestInvoice.payment_details}</p>
                     </div>
 
-                    {currentInvoice.status === "unpaid" && (
+                    {latestInvoice.status === "unpaid" && (
                       <button 
-                        onClick={() => handleMarkInvoicePaid(currentInvoice.id)}
+                        onClick={() => handleMarkInvoicePaid(latestInvoice.id)}
                         className="btn-secondary w-full text-sm"
                       >
                         Mark as Paid Manually
                       </button>
                     )}
+                  </div>
+                )}
+
+                {/* Invoice History */}
+                {sortedInvoices.length > 1 && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold text-on-surface/50 uppercase tracking-wider">Invoice History</h3>
+                    {sortedInvoices.slice(1).map((inv: any) => (
+                      <div key={inv.id} className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                        <div>
+                          <p className="text-sm font-medium text-on-surface">{formatPrice(inv.amount, inv.currency as any)}</p>
+                          <p className="text-xs text-on-surface/40 mt-0.5">{new Date(inv.created_at).toLocaleDateString()}</p>
+                        </div>
+                        <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded ${
+                          inv.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                        }`}>
+                          {inv.status}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
