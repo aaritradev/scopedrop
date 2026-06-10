@@ -21,6 +21,7 @@ export default function ProjectDetailPage() {
   // Invoice state
   const [invoiceAmount, setInvoiceAmount] = useState("");
   const [invoiceDetails, setInvoiceDetails] = useState("");
+  const [invoiceCurrency, setInvoiceCurrency] = useState<"INR" | "USD">("INR");
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
   
   // Chat state
@@ -124,17 +125,18 @@ export default function ProjectDetailPage() {
     e.preventDefault();
     setIsCreatingInvoice(true);
     
-    const amountInPaise = Math.round(parseFloat(invoiceAmount) * 100);
+    // Both INR and USD store smallest unit (paise / cents) × 100
+    const amountInSmallestUnit = Math.round(parseFloat(invoiceAmount) * 100);
 
     try {
       const res = await fetch(`/api/projects/${project.id}/invoice`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: amountInPaise,
-          payment_method: "upi",
+          amount: amountInSmallestUnit,
+          payment_method: invoiceCurrency === "INR" ? "upi" : "bank_transfer",
           payment_details: invoiceDetails,
-          currency: "INR"
+          currency: invoiceCurrency
         }),
       });
       
@@ -354,8 +356,40 @@ export default function ProjectDetailPage() {
                 {!currentInvoice || currentInvoice.status === "paid" ? (
                   <form onSubmit={handleCreateInvoice} className="card-base p-6 space-y-4">
                     <h3 className="text-sm font-semibold text-on-surface uppercase tracking-wider mb-2">Create New Invoice</h3>
+                    
+                    {/* Currency Selector */}
                     <div>
-                      <label className="block text-xs font-medium text-on-surface/55 mb-1.5">Amount (₹)</label>
+                      <label className="block text-xs font-medium text-on-surface/55 mb-1.5">Currency</label>
+                      <div className="flex rounded-xl border border-white/10 overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setInvoiceCurrency("INR")}
+                          className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
+                            invoiceCurrency === "INR"
+                              ? "bg-primary text-black"
+                              : "bg-black/20 text-on-surface/50 hover:text-on-surface"
+                          }`}
+                        >
+                          ₹ INR
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setInvoiceCurrency("USD")}
+                          className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
+                            invoiceCurrency === "USD"
+                              ? "bg-primary text-black"
+                              : "bg-black/20 text-on-surface/50 hover:text-on-surface"
+                          }`}
+                        >
+                          $ USD
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-on-surface/55 mb-1.5">
+                        Amount ({invoiceCurrency === "INR" ? "₹" : "$"})
+                      </label>
                       <input
                         type="number"
                         min="1"
@@ -364,17 +398,19 @@ export default function ProjectDetailPage() {
                         value={invoiceAmount}
                         onChange={(e) => setInvoiceAmount(e.target.value)}
                         className="input-base"
-                        placeholder="e.g. 50000"
+                        placeholder={invoiceCurrency === "INR" ? "e.g. 50000" : "e.g. 500"}
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-on-surface/55 mb-1.5">Payment Details (UPI ID / Bank Details)</label>
+                      <label className="block text-xs font-medium text-on-surface/55 mb-1.5">
+                        {invoiceCurrency === "INR" ? "Payment Details (UPI ID / Bank Details)" : "Payment Details (PayPal / Wire Transfer / etc.)"}
+                      </label>
                       <textarea
                         required
                         value={invoiceDetails}
                         onChange={(e) => setInvoiceDetails(e.target.value)}
                         className="input-base min-h-[100px] resize-y"
-                        placeholder="yourname@upi"
+                        placeholder={invoiceCurrency === "INR" ? "yourname@upi" : "paypal.me/yourname or bank wire details"}
                       />
                     </div>
                     <button type="submit" disabled={isCreatingInvoice} className="btn-primary w-full text-sm disabled:opacity-50">
