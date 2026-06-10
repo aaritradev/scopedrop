@@ -12,7 +12,7 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"scope" | "files" | "invoice" | "activity">("scope");
+  const [activeTab, setActiveTab] = useState<"scope" | "files" | "chat" | "invoice" | "activity">("scope");
   
   // File upload state
   const [isUploading, setIsUploading] = useState(false);
@@ -22,6 +22,11 @@ export default function ProjectDetailPage() {
   const [invoiceAmount, setInvoiceAmount] = useState("");
   const [invoiceDetails, setInvoiceDetails] = useState("");
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
+  
+  // Chat state
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [isSendingMsg, setIsSendingMsg] = useState(false);
   
   const [copied, setCopied] = useState(false);
 
@@ -42,6 +47,24 @@ export default function ProjectDetailPage() {
     fetchProject();
   }, [fetchProject]);
 
+  useEffect(() => {
+    if (!project || activeTab !== "chat") return;
+    
+    const fetchMessages = async () => {
+      try {
+        const res = await fetch(`/api/projects/${project.id}/messages`);
+        const data = await res.json();
+        if (res.ok && data.messages) {
+          setMessages(data.messages);
+        }
+      } catch (e) {}
+    };
+
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 3000);
+    return () => clearInterval(interval);
+  }, [project, activeTab]);
+
   const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = e.target.value;
     const res = await fetch(`/api/projects/${project.id}`, {
@@ -59,20 +82,36 @@ export default function ProjectDetailPage() {
     setIsUploading(true);
     setUploadError("");
 
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
-      const res = await fetch(`/api/projects/${project.id}/files`, {
+      // 1. Get signed upload URL
+      const presignRes = await fetch(`/api/projects/${project.id}/files`, {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "presign", fileName: file.name }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload failed");
+      const presignData = await presignRes.json();
+      if (!presignRes.ok) throw new Error(presignData.error || "Failed to initialize upload");
+
+      // 2. Upload file directly to Supabase Storage
+      const uploadRes = await fetch(presignData.signedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!uploadRes.ok) throw new Error("Failed to upload file to storage");
+
+      // 3. Confirm upload and save to database
+      const confirmRes = await fetch(`/api/projects/${project.id}/files`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "confirm", fileName: file.name, storagePath: presignData.storagePath }),
+      });
+      const confirmData = await confirmRes.json();
+      if (!confirmRes.ok) throw new Error(confirmData.error || "Failed to save file record");
       
       setProject({
         ...project,
-        portal_files: [data.file, ...(project.portal_files || [])],
+        portal_files: [confirmData.file, ...(project.portal_files || [])],
       });
     } catch (err: any) {
       setUploadError(err.message);
@@ -107,6 +146,28 @@ export default function ProjectDetailPage() {
       alert(err.message);
     } finally {
       setIsCreatingInvoice(false);
+    }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+    
+    setIsSendingMsg(true);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: newMessage }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessages([...messages, data.message]);
+        setNewMessage("");
+      }
+    } catch (e) {
+    } finally {
+      setIsSendingMsg(false);
     }
   };
 
@@ -149,7 +210,7 @@ export default function ProjectDetailPage() {
           </p>
 
           <div className="flex border-b border-white/10 mb-6 overflow-x-auto">
-            {["scope", "files", "invoice", "activity"].map((tab) => (
+            {["scope", "files", "chat", "invoice", "activity"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
@@ -219,6 +280,44 @@ export default function ProjectDetailPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {activeTab === "chat" && (
+              <div className="flex flex-col h-[500px] card-base overflow-hidden">
+                <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                  {messages.length === 0 ? (
+                    <div className="h-full flex items-center justify-center text-sm text-on-surface/40">
+                      No messages yet. Start the conversation!
+                    </div>
+                  ) : (
+                    messages.map((m) => {
+                      const isMe = m.actor === "freelancer";
+                      return (
+                        <div key={m.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                          <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${isMe ? "bg-primary text-black rounded-tr-sm" : "bg-white/10 text-on-surface rounded-tl-sm"}`}>
+                            <p className="whitespace-pre-wrap">{m.message}</p>
+                            <p className={`text-[10px] mt-1 ${isMe ? "text-black/60" : "text-on-surface/40"}`}>
+                              {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                <form onSubmit={handleSendMessage} className="p-4 border-t border-white/5 flex gap-2">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="input-base flex-1"
+                  />
+                  <button type="submit" disabled={isSendingMsg || !newMessage.trim()} className="btn-primary">
+                    Send
+                  </button>
+                </form>
               </div>
             )}
 
@@ -355,11 +454,11 @@ export default function ProjectDetailPage() {
               onChange={handleStatusChange}
               className="w-full input-base bg-black/20 cursor-pointer appearance-none"
             >
-              <option value="not_started">Not Started</option>
-              <option value="in_progress">In Progress</option>
-              <option value="in_review">In Review</option>
-              <option value="delivered">Delivered</option>
-              <option value="paid">Paid</option>
+              <option value="not_started" className="bg-[#1a1b1e] text-[#e3e2e5]">Not Started</option>
+              <option value="in_progress" className="bg-[#1a1b1e] text-[#e3e2e5]">In Progress</option>
+              <option value="in_review" className="bg-[#1a1b1e] text-[#e3e2e5]">In Review</option>
+              <option value="delivered" className="bg-[#1a1b1e] text-[#e3e2e5]">Delivered</option>
+              <option value="paid" className="bg-[#1a1b1e] text-[#e3e2e5]">Paid</option>
             </select>
           </div>
 

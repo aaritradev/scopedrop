@@ -51,7 +51,7 @@ export default function BriefSharePage() {
               </p>
             </div>
 
-            <OutputView brief={brief.generated_brief} />
+            <OutputView brief={brief.generated_brief} isClientView={true} />
 
             {/* Sign-up CTA */}
             <div className="mt-10 rounded-xl border border-white/10 bg-white/[0.02] px-6 py-8 text-center">

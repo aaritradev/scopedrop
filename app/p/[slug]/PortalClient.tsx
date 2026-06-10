@@ -17,6 +17,11 @@ export function PortalClient({ slug }: { slug: string }) {
   const [uploadError, setUploadError] = useState("");
   const [paying, setPaying] = useState(false);
 
+  // Chat states
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [isSendingMsg, setIsSendingMsg] = useState(false);
+
   useEffect(() => {
     fetch(`/api/portal/${slug}`)
       .then((res) => {
@@ -26,6 +31,22 @@ export function PortalClient({ slug }: { slug: string }) {
       .then((resData) => setData(resData.project))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+  }, [slug]);
+
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        const res = await fetch(`/api/portal/${slug}/messages`);
+        const resData = await res.json();
+        if (res.ok && resData.messages) {
+          setMessages(resData.messages);
+        }
+      } catch (e) {}
+    };
+
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 3000);
+    return () => clearInterval(interval);
   }, [slug]);
 
   const handleApprove = async () => {
@@ -50,20 +71,36 @@ export function PortalClient({ slug }: { slug: string }) {
     setUploading(true);
     setUploadError("");
 
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
-      const res = await fetch(`/api/portal/${slug}/files`, {
+      // 1. Get signed upload URL
+      const presignRes = await fetch(`/api/portal/${slug}/files`, {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "presign", fileName: file.name }),
       });
-      const resData = await res.json();
-      if (!res.ok) throw new Error(resData.error || "Upload failed");
+      const presignData = await presignRes.json();
+      if (!presignRes.ok) throw new Error(presignData.error || "Failed to initialize upload");
+
+      // 2. Upload file directly to Supabase Storage
+      const uploadRes = await fetch(presignData.signedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!uploadRes.ok) throw new Error("Failed to upload file to storage");
+
+      // 3. Confirm upload and save to database
+      const confirmRes = await fetch(`/api/portal/${slug}/files`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "confirm", fileName: file.name, storagePath: presignData.storagePath }),
+      });
+      const confirmData = await confirmRes.json();
+      if (!confirmRes.ok) throw new Error(confirmData.error || "Failed to save file record");
 
       setData({
         ...data,
-        portal_files: [resData.file, ...(data.portal_files || [])]
+        portal_files: [confirmData.file, ...(data.portal_files || [])]
       });
     } catch (err: any) {
       setUploadError(err.message);
@@ -90,6 +127,28 @@ export function PortalClient({ slug }: { slug: string }) {
       }
     } finally {
       setPaying(false);
+    }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+    
+    setIsSendingMsg(true);
+    try {
+      const res = await fetch(`/api/portal/${slug}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: newMessage }),
+      });
+      const resData = await res.json();
+      if (res.ok) {
+        setMessages([...messages, resData.message]);
+        setNewMessage("");
+      }
+    } catch (e) {
+    } finally {
+      setIsSendingMsg(false);
     }
   };
 
@@ -149,13 +208,55 @@ export function PortalClient({ slug }: { slug: string }) {
           </div>
           {data.briefs ? (
             <div className="rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-               <OutputView brief={data.briefs.generated_brief} canExportPDF={false} />
+               <OutputView brief={data.briefs.generated_brief} canExportPDF={false} isClientView={true} />
             </div>
           ) : (
             <div className="p-8 text-center text-sm text-on-surface/50 card-base">
               No scope document attached.
             </div>
           )}
+        </section>
+
+        {/* Chat Section */}
+        <section className="space-y-6">
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-xl font-bold text-on-surface">Messages</h2>
+          </div>
+          <div className="flex flex-col h-[400px] card-base overflow-hidden border border-white/10 shadow-2xl">
+            <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-[#121315]/50">
+              {messages.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-sm text-on-surface/40">
+                  No messages yet. Send a message to {data.freelancer_name}.
+                </div>
+              ) : (
+                messages.map((m) => {
+                  const isMe = m.actor === "client";
+                  return (
+                    <div key={m.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${isMe ? "bg-primary text-black rounded-tr-sm" : "bg-white/10 text-on-surface rounded-tl-sm"}`}>
+                        <p className="whitespace-pre-wrap">{m.message}</p>
+                        <p className={`text-[10px] mt-1 ${isMe ? "text-black/60" : "text-on-surface/40"}`}>
+                          {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <form onSubmit={handleSendMessage} className="p-4 border-t border-white/10 flex gap-2 bg-black/20">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type your message..."
+                className="input-base flex-1 bg-white/5 border-white/10"
+              />
+              <button type="submit" disabled={isSendingMsg || !newMessage.trim()} className="btn-primary shrink-0">
+                Send
+              </button>
+            </form>
+          </div>
         </section>
 
         <div className="grid md:grid-cols-2 gap-8">

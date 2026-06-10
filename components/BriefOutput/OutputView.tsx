@@ -35,6 +35,7 @@ interface OutputViewProps {
   onCreatePortal?: () => void;
   onPortalUpgrade?: () => void;
   canCreatePortal?: boolean;
+  isClientView?: boolean;
 }
 
 export function OutputView({
@@ -51,8 +52,16 @@ export function OutputView({
   onCreatePortal,
   onPortalUpgrade,
   canCreatePortal = false,
+  isClientView = false,
 }: OutputViewProps) {
   const [activeTab, setActiveTab] = useState<TabId>("brief");
+
+  const visibleTabs = tabs.filter((tab) => {
+    if (isClientView && (tab.id === "flags" || tab.id === "analysis")) {
+      return false;
+    }
+    return true;
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -133,7 +142,7 @@ export function OutputView({
 
       <div className="border-b" style={{ borderColor: "oklch(0.22 0.035 260)" }}>
         <div className="flex gap-0 px-6 overflow-x-auto">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -159,8 +168,8 @@ export function OutputView({
         {activeTab === "scope" && <ScopeTab brief={brief} editable={editable} onChange={onChange} />}
         {activeTab === "timeline" && <TimelineTab brief={brief} editable={editable} onChange={onChange} />}
         {activeTab === "payment" && <PaymentTab brief={brief} editable={editable} onChange={onChange} />}
-        {activeTab === "flags" && <RedFlagsTab brief={brief} editable={editable} onChange={onChange} />}
-        {activeTab === "analysis" && <AnalysisTab brief={brief} />}
+        {!isClientView && activeTab === "flags" && <RedFlagsTab brief={brief} editable={editable} onChange={onChange} />}
+        {!isClientView && activeTab === "analysis" && <AnalysisTab brief={brief} />}
       </div>
 
       <div className="flex items-center gap-3 border-t px-6 py-4" style={{ borderColor: "oklch(0.22 0.035 260)" }}>

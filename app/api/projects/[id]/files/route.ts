@@ -37,60 +37,58 @@ export async function POST(
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  const formData = await req.formData();
-  const file = formData.get("file") as File | null;
+  const body = await req.json();
+  const { action, fileName, storagePath } = body;
 
-  if (!file) {
-    return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  if (action === "presign") {
+    if (!fileName) return NextResponse.json({ error: "fileName required" }, { status: 400 });
+    const newStoragePath = `${project.id}/freelancer/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    
+    const { data: signedData, error: signError } = await sb.storage
+      .from("project-files")
+      .createSignedUploadUrl(newStoragePath);
+      
+    if (signError || !signedData) {
+      return NextResponse.json({ error: "Failed to generate upload URL: " + signError?.message }, { status: 500 });
+    }
+    
+    return NextResponse.json({ signedUrl: signedData.signedUrl, storagePath: newStoragePath });
   }
 
-  if (file.size > MAX_FILE_SIZE) {
-    return NextResponse.json({ error: "File must be under 25 MB" }, { status: 400 });
-  }
+  if (action === "confirm") {
+    if (!fileName || !storagePath) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    
+    // Get a signed URL (valid for 7 days — freelancer view only)
+    const { data: signedDownload } = await sb.storage
+      .from("project-files")
+      .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
 
-  const ext = file.name.split(".").pop() ?? "bin";
-  const storagePath = `${project.id}/freelancer/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const { data: fileRecord, error: dbError } = await sb
+      .from("portal_files")
+      .insert({
+        project_id: project.id,
+        uploaded_by: "freelancer",
+        file_name: fileName,
+        file_url: storagePath,
+      })
+      .select("id, file_name, file_url, uploaded_by, created_at")
+      .single();
 
-  const arrayBuffer = await file.arrayBuffer();
-  const { error: uploadError } = await sb.storage
-    .from("project-files")
-    .upload(storagePath, arrayBuffer, {
-      contentType: file.type || "application/octet-stream",
-      upsert: false,
+    if (dbError) {
+      return NextResponse.json({ error: "Failed to save file record" }, { status: 500 });
+    }
+
+    // Log activity
+    await sb.from("portal_activity").insert({
+      project_id: project.id,
+      event: "file_uploaded",
+      actor: "freelancer",
     });
 
-  if (uploadError) {
-    return NextResponse.json({ error: "Upload failed: " + uploadError.message }, { status: 500 });
+    return NextResponse.json({
+      file: { ...fileRecord, signed_url: signedDownload?.signedUrl },
+    }, { status: 201 });
   }
 
-  // Get a signed URL (valid for 7 days — freelancer view only)
-  const { data: signedData } = await sb.storage
-    .from("project-files")
-    .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
-
-  const { data: fileRecord, error: dbError } = await sb
-    .from("portal_files")
-    .insert({
-      project_id: project.id,
-      uploaded_by: "freelancer",
-      file_name: file.name,
-      file_url: storagePath, // store path, generate signed URL on demand
-    })
-    .select("id, file_name, file_url, uploaded_by, created_at")
-    .single();
-
-  if (dbError) {
-    return NextResponse.json({ error: "Failed to save file record" }, { status: 500 });
-  }
-
-  // Log activity
-  await sb.from("portal_activity").insert({
-    project_id: project.id,
-    event: "file_uploaded",
-    actor: "freelancer",
-  });
-
-  return NextResponse.json({
-    file: { ...fileRecord, signed_url: signedData?.signedUrl },
-  }, { status: 201 });
+  return NextResponse.json({ error: "Invalid action" }, { status: 400 });
 }
