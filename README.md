@@ -68,19 +68,6 @@ The goal is to reduce misunderstandings, improve project estimation, and help fr
 
 ---
 
-## 📸 Screenshots
-
-> Add screenshots here.
-
-Example:
-
-```
-/screenshots/dashboard.png
-/screenshots/report.png
-/screenshots/analysis.png
-```
-
----
 
 ## 🚀 Getting Started
 
